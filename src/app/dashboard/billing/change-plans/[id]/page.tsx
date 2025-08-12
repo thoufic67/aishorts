@@ -1,4 +1,4 @@
-import { Button } from "@lemonsqueezy/wedges";
+import { Button } from "@/components/ui/button";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -58,7 +58,7 @@ export default async function ChangePlansPage({
       subtitle="Choose a plan that works for you."
       action={
         <div className="flex items-center gap-4">
-          <Button asChild variant="tertiary">
+          <Button asChild variant="secondary">
             <Link href="/dashboard/billing">Back to Billing</Link>
           </Button>
           <PageTitleAction />

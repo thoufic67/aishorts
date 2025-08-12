@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Loading } from "@lemonsqueezy/wedges";
+import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import { CheckIcon, WebhookIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,22 +15,19 @@ export function SetupWebhookButton({
   const [loading, setLoading] = useState(false);
   const [activated, setActivated] = useState(false);
 
-  const beforeElement = loading ? (
-    <Loading size="sm" className="size-4" />
-  ) : (
-    <WebhookIcon className="size-4" />
-  );
+  let iconElement;
+  if (loading) {
+    iconElement = <Loading size="sm" className="size-4" />;
+  } else if (!activated && !disabled) {
+    iconElement = <WebhookIcon className="size-4" />;
+  } else {
+    iconElement = <CheckIcon className="size-4" />;
+  }
 
   return (
     <Button
       disabled={disabled || loading || activated}
-      before={
-        !activated && !disabled ? (
-          beforeElement
-        ) : (
-          <CheckIcon className="size-4" />
-        )
-      }
+      className="flex items-center gap-2"
       onClick={async () => {
         setLoading(true);
         try {
@@ -48,6 +46,7 @@ export function SetupWebhookButton({
         }
       }}
     >
+      {iconElement}
       Setup Webhook
     </Button>
   );

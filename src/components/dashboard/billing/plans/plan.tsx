@@ -1,5 +1,5 @@
 import { SearchXIcon } from "lucide-react";
-import { Alert } from "@lemonsqueezy/wedges";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { type NewPlan } from "@/db/schema";
 import { cn, formatPrice } from "@/lib/utils";
 import { Section } from "../../section";
@@ -18,11 +18,11 @@ export function Plan({
   const isCurrent = id && currentPlan?.id === id;
 
   return (
-    <Section className={cn("not-prose", isCurrent && "bg-surface-50/40")}>
+    <Section className={cn("not-prose", isCurrent && "bg-muted/40")}>
       <Section.Item className="flex-col items-start gap-2">
         <header className="flex w-full items-center justify-between">
           {name ? (
-            <h2 className="text-lg text-surface-900">
+            <h2 className="text-lg text-foreground">
               {productName} ({name})
             </h2>
           ) : null}
@@ -39,7 +39,7 @@ export function Plan({
 
       <Section.Item className="flex-col items-start">
         <div className={cn(isCurrent && "opacity-60")}>
-          <span className="mr-0.5 text-xl text-surface-900">
+          <span className="mr-0.5 text-xl text-foreground">
             {formatPrice(price)}
           </span>
           {!plan.isUsageBased && interval ? ` per ${interval}` : null}
@@ -79,15 +79,17 @@ export function NoPlans() {
 export function InfoMessage() {
   return (
     <Alert className="not-prose mt-2">
-      Follow{" "}
-      <a
-        href="https://docs.lemonsqueezy.com/guides/developer-guide/testing-going-live#testing-the-checkout"
-        target="_blank"
-        className="text-gray-900 underline hover:text-primary"
-      >
-        these instructions
-      </a>{" "}
-      on how to do test payments with Lemon Squeezy.
+      <AlertDescription>
+        Follow{" "}
+        <a
+          href="https://docs.lemonsqueezy.com/guides/developer-guide/testing-going-live#testing-the-checkout"
+          target="_blank"
+          className="text-foreground underline hover:text-primary"
+        >
+          these instructions
+        </a>{" "}
+        on how to do test payments with Lemon Squeezy.
+      </AlertDescription>
     </Alert>
   );
 }

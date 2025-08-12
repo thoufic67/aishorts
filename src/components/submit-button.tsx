@@ -1,28 +1,40 @@
 "use client";
 
-import { Button, Loading } from "@lemonsqueezy/wedges";
-import { type ComponentProps, type ElementRef, forwardRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
+import {
+  type ComponentProps,
+  type ElementRef,
+  forwardRef,
+  type ReactNode,
+} from "react";
 import { useFormStatus } from "react-dom";
+import { cn } from "@/lib/utils";
 
 type ButtonElement = ElementRef<typeof Button>;
-type ButtonProps = ComponentProps<typeof Button>;
+type ButtonProps = ComponentProps<typeof Button> & {
+  before?: ReactNode;
+};
 
 export const SubmitButton = forwardRef<ButtonElement, ButtonProps>(
-  (props, ref) => {
+  ({ before, className, children, ...props }, ref) => {
     const { pending } = useFormStatus();
-    const before = pending ? (
-      <Loading size="sm" className="dark" color="secondary" />
+    const loadingIcon = pending ? (
+      <Loading size="sm" color="secondary" />
     ) : (
-      props.before
+      before
     );
 
     return (
       <Button
         {...props}
-        before={before}
         ref={ref}
         disabled={pending || props.disabled}
-      />
+        className={cn("flex items-center gap-2", className)}
+      >
+        {loadingIcon}
+        {children}
+      </Button>
     );
   },
 );

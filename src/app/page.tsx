@@ -1,6 +1,6 @@
 import { CitrusIcon } from "lucide-react";
 import { signIn } from "@/auth";
-import { GithubIcon } from "@/components/icons/github";
+import { GoogleIcon } from "@/components/icons/google";
 import { LemonSqueezyIcon } from "@/components/icons/lemonsqueezy";
 import { SubmitButton } from "@/components/submit-button";
 
@@ -25,16 +25,14 @@ export default function Home() {
           className="pt-2"
           action={async () => {
             "use server";
-            await signIn("github");
+            await signIn("google");
           }}
         >
           <SubmitButton
-            before={<GithubIcon />}
-            className="py-2.5 text-base"
-            shape="pill"
-            variant="primary"
+            before={<GoogleIcon />}
+            className="rounded-full py-2.5 text-base"
           >
-            Sign in with GitHub
+            Sign in with Google
           </SubmitButton>
         </form>
       </main>

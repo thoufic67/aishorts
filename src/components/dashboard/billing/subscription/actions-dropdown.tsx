@@ -1,6 +1,15 @@
 "use client";
 
-import { Button, DropdownMenu, Loading } from "@lemonsqueezy/wedges";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Loading } from "@/components/ui/loading";
 import { MoreVerticalIcon } from "lucide-react";
 import { useState } from "react";
 import { type NewSubscription } from "@/db/schema";
@@ -32,25 +41,26 @@ export function SubscriptionActionsDropdown({
   return (
     <>
       {loading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-surface-50/50">
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/50">
           <Loading size="sm" />
         </div>
       )}
 
       <DropdownMenu>
-        <DropdownMenu.Trigger asChild>
+        <DropdownMenuTrigger asChild>
           <Button
             size="sm"
-            variant="transparent"
-            className="size-8 data-[state=open]:bg-surface-50"
-            before={<MoreVerticalIcon className="size-4" />}
-          />
-        </DropdownMenu.Trigger>
+            variant="ghost"
+            className="data-[state=open]:bg-muted size-8"
+          >
+            <MoreVerticalIcon className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
 
-        <DropdownMenu.Content side="bottom" className="z-10" align="end">
-          <DropdownMenu.Group>
+        <DropdownMenuContent side="bottom" className="z-10" align="end">
+          <DropdownMenuGroup>
             {!subscription.isPaused && (
-              <DropdownMenu.Item
+              <DropdownMenuItem
                 onClick={async () => {
                   setLoading(true);
                   await pauseUserSubscription(subscription.lemonSqueezyId).then(
@@ -61,11 +71,11 @@ export function SubscriptionActionsDropdown({
                 }}
               >
                 Pause payments
-              </DropdownMenu.Item>
+              </DropdownMenuItem>
             )}
 
             {subscription.isPaused && (
-              <DropdownMenu.Item
+              <DropdownMenuItem
                 onClick={async () => {
                   setLoading(true);
                   await unpauseUserSubscription(
@@ -76,22 +86,22 @@ export function SubscriptionActionsDropdown({
                 }}
               >
                 Unpause payments
-              </DropdownMenu.Item>
+              </DropdownMenuItem>
             )}
 
-            <DropdownMenu.Item asChild>
+            <DropdownMenuItem asChild>
               <a href={urls.customer_portal}>Customer portal ↗</a>
-            </DropdownMenu.Item>
+            </DropdownMenuItem>
 
             <LemonSqueezyModalLink href={urls.update_payment_method}>
               Update payment method
             </LemonSqueezyModalLink>
-          </DropdownMenu.Group>
+          </DropdownMenuGroup>
 
-          <DropdownMenu.Separator />
+          <DropdownMenuSeparator />
 
-          <DropdownMenu.Group>
-            <DropdownMenu.Item
+          <DropdownMenuGroup>
+            <DropdownMenuItem
               onClick={async () => {
                 if (
                   // eslint-disable-next-line no-alert -- allow
@@ -105,12 +115,12 @@ export function SubscriptionActionsDropdown({
                   });
                 }
               }}
-              destructive
+              className="text-destructive focus:text-destructive"
             >
               Cancel subscription
-            </DropdownMenu.Item>
-          </DropdownMenu.Group>
-        </DropdownMenu.Content>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
       </DropdownMenu>
     </>
   );

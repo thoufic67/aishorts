@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Loading } from "@lemonsqueezy/wedges";
+import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import { CheckIcon, PlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -12,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { type NewPlan } from "@/db/schema";
 import { changePlan, getCheckoutURL } from "@/app/actions";
+import { cn } from "@/lib/utils";
 
 type ButtonElement = ElementRef<typeof Button>;
 type ButtonProps = ComponentProps<typeof Button> & {
@@ -43,9 +45,9 @@ export const SignupButton = forwardRef<ButtonElement, ButtonProps>(
         : "Sign up";
 
     // eslint-disable-next-line no-nested-ternary -- disabled
-    const before = loading ? (
-      <Loading size="sm" className="size-4 dark" color="secondary" />
-    ) : (props.before ?? isCurrent) ? (
+    const iconElement = loading ? (
+      <Loading size="sm" className="size-4" color="secondary" />
+    ) : isCurrent ? (
       <CheckIcon className="size-4" />
     ) : (
       <PlusIcon className="size-4" />
@@ -54,8 +56,8 @@ export const SignupButton = forwardRef<ButtonElement, ButtonProps>(
     return (
       <Button
         ref={ref}
-        before={before}
         disabled={(loading || isCurrent) ?? props.disabled}
+        className={cn("flex items-center gap-2", props.className)}
         onClick={async () => {
           // If changing plans, call server action.
           if (isChangingPlans) {
@@ -95,6 +97,7 @@ export const SignupButton = forwardRef<ButtonElement, ButtonProps>(
         }}
         {...otherProps}
       >
+        {iconElement}
         {label}
       </Button>
     );

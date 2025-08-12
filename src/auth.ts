@@ -1,6 +1,6 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import NextAuth, { type NextAuthConfig } from "next-auth";
-import GitHub from "next-auth/providers/github";
+import Google from "next-auth/providers/google";
 import { accounts, db, sessions, users } from "./db/schema";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -9,7 +9,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     accountsTable: accounts,
     sessionsTable: sessions,
   }),
-  providers: [GitHub],
+  providers: [Google],
   basePath: "/api/auth",
   pages: {
     signIn: "/",

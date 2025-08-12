@@ -3,6 +3,7 @@ import { DashboardContent } from "@/components/dashboard/content";
 import { PageTitleAction } from "@/components/dashboard/page-title-action";
 import { SetupWebhookButton } from "@/components/dashboard/setup-webhook-button";
 import { hasWebhook } from "../actions";
+import Dashboard from "@/components/dashboard/dashboard";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -12,10 +13,7 @@ export default async function Page() {
 
   return (
     <DashboardContent title="Dashboard" action={<PageTitleAction />}>
-      <p>
-        This page is protected by the <code>auth</code> middleware. Navigate to
-        the <Link href="/dashboard/billing">Billing page</Link> to get started.
-      </p>
+      <Dashboard />
 
       {!hasWh && (
         <>

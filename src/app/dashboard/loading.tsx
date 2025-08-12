@@ -1,4 +1,4 @@
-import { Loading } from "@lemonsqueezy/wedges";
+import { Loading } from "@/components/ui/loading";
 import { DashboardContent } from "@/components/dashboard/content";
 
 export default function LoadingComponent() {

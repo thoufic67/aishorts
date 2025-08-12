@@ -1,55 +1,48 @@
-import { type Subscription } from "@lemonsqueezy/lemonsqueezy.js";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { type SubscriptionStatusType } from "@/types/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatPrice(priceInCents: string) {
-  const price = parseFloat(priceInCents);
-  const dollars = price / 100;
-
+/**
+ * Format a price string from cents to dollars
+ */
+export function formatPrice(price: string | number): string {
+  const priceNumber = typeof price === "string" ? parseInt(price, 10) : price;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    // Use minimumFractionDigits to handle cases like $59.00 -> $59
-    minimumFractionDigits: dollars % 1 !== 0 ? 2 : 0,
-  }).format(dollars);
+  }).format(priceNumber / 100);
 }
 
-export function formatDate(date: string | number | Date | null | undefined) {
+/**
+ * Format a date string for display
+ */
+export function formatDate(date: string | null | undefined): string {
   if (!date) return "";
-
-  return new Date(date).toLocaleString("en-US", {
-    day: "2-digit",
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
+    day: "numeric",
     year: "numeric",
-  });
+  }).format(new Date(date));
 }
 
-export function checkRequiredEnv() {
-  if (!process.env.LEMONSQUEEZY_API_KEY) {
-    throw new Error("Missing LEMONSQUEEZY_API_KEY. Set it in your .env file.");
-  }
-
-  if (!process.env.LEMONSQUEEZY_STORE_ID) {
-    throw new Error("Missing LEMONSQUEEZY_STORE_ID. Set it in your .env file.");
-  }
-
-  if (!process.env.LEMONSQUEEZY_STORE_ID) {
-    throw new Error("Missing LEMONSQUEEZY_API_KEY. Set it in your .env file.");
-  }
+/**
+ * Check if a subscription status is valid/active
+ */
+export function isValidSubscription(status: SubscriptionStatusType): boolean {
+  return ["active", "on_trial", "paused"].includes(status);
 }
 
-export function isValidSubscription(
-  status: Subscription["data"]["attributes"]["status"],
-) {
-  return status !== "cancelled" && status !== "expired" && status !== "unpaid";
-}
-
-export function takeUniqueOrThrow<T extends unknown[]>(values: T): T[number] {
-  if (values.length !== 1)
-    throw new Error("Found non unique or inexistent value");
-  return values[0];
+/**
+ * Get a unique result from an array, throw if not exactly one
+ */
+export function takeUniqueOrThrow<T>(items: T[]): T {
+  if (items.length !== 1) {
+    throw new Error(`Expected exactly one item, got ${items.length}`);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- We check the length above
+  return items[0]!;
 }

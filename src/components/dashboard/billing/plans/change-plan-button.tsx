@@ -1,4 +1,4 @@
-import { Button } from "@lemonsqueezy/wedges";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 export function ChangePlan({ planId }: { planId: number }) {

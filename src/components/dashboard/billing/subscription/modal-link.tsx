@@ -1,6 +1,6 @@
 "use client";
 
-import { DropdownMenu } from "@lemonsqueezy/wedges";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { type ReactNode, useEffect } from "react";
 
 export function LemonSqueezyModalLink({
@@ -15,7 +15,7 @@ export function LemonSqueezyModalLink({
   }, []);
 
   return (
-    <DropdownMenu.Item
+    <DropdownMenuItem
       onClick={() => {
         if (href) {
           window.LemonSqueezy.Url.Open(href);
@@ -27,6 +27,6 @@ export function LemonSqueezyModalLink({
       }}
     >
       {children}
-    </DropdownMenu.Item>
+    </DropdownMenuItem>
   );
 }
