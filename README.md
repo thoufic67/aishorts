@@ -14,6 +14,7 @@ Using the following stack:
 - Styling - [Tailwind CSS](https://tailwindcss.com)
 - Components - [shadcn/ui](https://ui.shadcn.com)
 - Serverless Postgres - [Neon](https://neon.tech/)
+- AI Integration - [OpenAI](https://openai.com)
 - Linting - [ESLint](https://eslint.org)
 - Formatting - [Prettier](https://prettier.io)
 
@@ -78,6 +79,8 @@ AUTH_SECRET=
 AUTH_URL=
 
 NEXT_PUBLIC_APP_URL=
+
+OPENAI_API_KEY=
 ```
 
 #### Lemon Squeezy
@@ -121,6 +124,10 @@ or go to https://generate-secret.now.sh/32 to generate a random secret.
 Next, you need to provide the URL of your app in `AUTH_URL` in format `https://your-app-url.com/api/auth`. For local development, you can use `http://localhost:3000/api/auth`.
 
 Finally, you will need to add the URL of your app in `NEXT_PUBLIC_APP_URL`. For example, `http://localhost:3000`.
+
+#### OpenAI
+
+You will need an OpenAI API key to use the script generation features. Go to [OpenAI Platform](https://platform.openai.com/api-keys) and create a new API key. Add this key to your `.env` file where it says `OPENAI_API_KEY=`.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
@@ -178,3 +185,51 @@ There are a few things to update in your code to go live.
 You need to turn off the **Test mode** in your Lemon Squeezy store and add a new live mode API key. Add this API key as an environment variable in your live server, using the same name `LEMONSQUEEZY_API_KEY`. Your store ID remains the same in both test and live mode, so add that to your server environment variables, as you did for your development site.
 
 You also need to create a new webhook in your live store. Make sure you add the signing secret into the `LEMONSQUEEZY_WEBHOOK_SECRET` variable on your server.
+
+## API Endpoints
+
+### Generate Script API
+
+The app includes an AI-powered script generation API that creates engaging video scripts.
+
+**Endpoint:** `POST /api/generate-script`
+
+**Authentication:** Required (JWT token)
+
+**Request Body:**
+
+```json
+{
+  "userPrompt": "Create a horror story about a haunted mirror",
+  "scriptStyle": "horror",
+  "duration": 60
+}
+```
+
+**Parameters:**
+
+- `userPrompt` (string, required): The main idea or theme for the script
+- `scriptStyle` (string, required): Currently supports "horror"
+- `duration` (number, required): Script duration in seconds (10-300)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "script": "Generated script content...",
+  "metadata": {
+    "userPrompt": "Create a horror story about a haunted mirror",
+    "scriptStyle": "horror",
+    "duration": 60,
+    "generatedAt": "2024-01-15T10:30:00Z",
+    "userId": "user_id"
+  }
+}
+```
+
+**Error Responses:**
+
+- `401`: Authentication required
+- `400`: Invalid request parameters
+- `500`: Internal server error

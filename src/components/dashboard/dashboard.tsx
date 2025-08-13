@@ -9,8 +9,8 @@ import { Plus, Video, Clock, MoreVertical, Play, Trash2 } from "lucide-react";
 import { ProjectStorage, ProjectData } from "@/lib/project-storage";
 
 const Dashboard = () => {
-  const router = useRouter();
   const [projects, setProjects] = useState<ProjectData[]>([]);
+  const router = useRouter();
 
   useEffect(() => {
     loadProjects();
@@ -22,7 +22,8 @@ const Dashboard = () => {
   };
 
   const handleCreateProject = () => {
-    router.push("/create-project");
+    console.log("thoufic handlecreateproject");
+    router.push("/create-video");
   };
 
   const handleOpenProject = (projectId: string) => {
@@ -95,7 +96,7 @@ const Dashboard = () => {
         </div>
 
         {/* Stats */}
-        <div className="mb-8 grid gap-6 md:grid-cols-4">
+        {/* <div className="mb-8 grid gap-6 md:grid-cols-4">
           <Card className="bg-card/50 p-6 backdrop-blur-sm">
             <div className="text-2xl font-bold text-primary">
               {projects.length}
@@ -129,7 +130,7 @@ const Dashboard = () => {
             </div>
             <div className="text-sm text-foreground/70">Total Videos</div>
           </Card>
-        </div>
+        </div> */}
 
         {/* Projects Grid */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -138,7 +139,7 @@ const Dashboard = () => {
             return (
               <Card
                 key={project.id}
-                className="bg-card/30 border-border/50 hover:bg-card/50 group cursor-pointer overflow-hidden backdrop-blur-sm transition-all duration-300"
+                className="group cursor-pointer overflow-hidden border-border/50 bg-card/30 backdrop-blur-sm transition-all duration-300 hover:bg-card/50"
                 onClick={() => handleOpenProject(project.id)}
               >
                 {/* Thumbnail */}
@@ -151,7 +152,7 @@ const Dashboard = () => {
                     />
                   ) : (
                     <>
-                      <div className="to-accent/20 absolute inset-0 bg-gradient-to-br from-primary/20" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
                       <div className="absolute inset-0 flex items-center justify-center">
                         <Video className="h-12 w-12 text-foreground/30" />
                       </div>

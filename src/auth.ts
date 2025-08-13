@@ -22,12 +22,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (isOnDashboard) {
         // Redirect unauthenticated users to the login page
         return isLoggedIn;
-      } else if (isLoggedIn) {
-        // Redirect authenticated users to the dashboard
-        return Response.redirect(new URL("/dashboard", nextUrl));
       }
 
-      // Allow unauthenticated users to access other pages
+      // Allow authenticated users to access any route
+      // Allow unauthenticated users to access non-dashboard routes
       return true;
     },
   },

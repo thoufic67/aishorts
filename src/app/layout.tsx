@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Lemon Squeezy Next.js Billing App Template",
+  title: "Create short videos easily",
 };
 
 export default function RootLayout({

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { DashboardContent } from "@/components/dashboard/content";
 import { PageTitleAction } from "@/components/dashboard/page-title-action";
 import { SetupWebhookButton } from "@/components/dashboard/setup-webhook-button";
-import { hasWebhook } from "../actions";
+import { hasWebhook } from "@/app/actions";
 import Dashboard from "@/components/dashboard/dashboard";
 
 export const dynamic = "force-dynamic";
