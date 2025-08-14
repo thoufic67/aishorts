@@ -52,6 +52,8 @@ export function VideoFramesPanel({
   totalDuration,
   onSegmentUpdate,
   onSegmentInsert,
+  orientation = 'vertical',
+  showHeader = true,
 }: VideoFramesPanelProps) {
   const [editingState, setEditingState] = useState<EditingState | null>(null);
   const [newFrameState, setNewFrameState] = useState<NewFrameState | null>(null);
@@ -316,35 +318,41 @@ export function VideoFramesPanel({
     }
   };
 
+  const isHorizontal = orientation === 'horizontal';
+
   return (
-    <div className="w-80 border-r bg-white">
+    <div className={isHorizontal ? "w-full" : "w-80 border-r bg-white"}>
       {/* Header */}
-      <div className="flex h-14 items-center justify-between border-b px-4">
-        <h2 className="font-medium">Frames</h2>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm">
-            <Settings className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
+      {showHeader && (
+        <div className={`flex items-center justify-between ${isHorizontal ? "p-4 border-b" : "h-14 border-b px-4"}`}>
+          <h2 className="font-medium text-sm">
+            {isHorizontal ? "Segments" : "Frames"}
+          </h2>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm">
+              <Settings className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Frames list */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-3">
+      <div className={`${isHorizontal ? "overflow-x-auto p-4" : "flex-1 overflow-y-auto p-4"}`}>
+        <div className={isHorizontal ? "flex gap-3" : "space-y-3"}>
           {segments.map((segment, index) => (
-            <div key={`frame-group-${index}`}>
+            <div key={`frame-group-${index}`} className={isHorizontal ? "flex-shrink-0 flex items-center gap-2" : ""}>
               {/* Add frame button before first frame */}
               {index === 0 && (
-                <div className="mb-3 flex justify-center">
+                <div className={`flex ${isHorizontal ? "flex-col items-center" : "mb-3 justify-center"}`}>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 rounded-full border-2 border-dashed border-gray-300 p-0 text-gray-400 hover:border-blue-400 hover:text-blue-500"
                     onClick={() => handleCreateNewFrame(-1)}
-                    title="Add frame at beginning"
+                    title={isHorizontal ? "Add segment at beginning" : "Add frame at beginning"}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -352,19 +360,20 @@ export function VideoFramesPanel({
               )}
               
               <Card
-                className={`cursor-pointer border transition-all ${
+                className={`cursor-pointer border transition-all ${isHorizontal ? "w-20" : ""} ${
                   selectedFrameIndex === index
                     ? "border-blue-500 bg-blue-50"
                     : "border-gray-200 hover:border-gray-300"
                 }`}
                 onClick={() => onFrameSelect(index)}
               >
-              <div className="p-3">
+              <div className={isHorizontal ? "p-2" : "p-3"}>
                 {/* Frame header */}
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex w-full items-center justify-between gap-2">
-                    <span className="text-sm font-medium">#{index}</span>
-                    <div className="flex items-center gap-1">
+                {!isHorizontal && (
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <span className="text-sm font-medium">#{index}</span>
+                      <div className="flex items-center gap-1">
                       <Dialog open={editingState?.index === index} onOpenChange={(open) => !open && setEditingState(null)}>
                         <DialogTrigger asChild>
                           <Button 
@@ -615,18 +624,19 @@ export function VideoFramesPanel({
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Frame thumbnail and content */}
-                <div className="space-y-2">
+                <div className={isHorizontal ? "relative" : "space-y-2"}>
                   {/* Thumbnail - Use actual video/image */}
-                  <div className="relative mx-auto overflow-hidden rounded">
+                  <div className={`relative overflow-hidden rounded ${isHorizontal ? "h-16 w-12 mx-auto" : "mx-auto"}`}>
                     {/* Display actual media if available */}
                     {segment.media && segment.media.length > 0 ? (
                       <video
                         autoPlay
                         playsInline
                         src={segment.media[0].url}
-                        className="mx-auto aspect-[9/16] h-full w-full max-w-48 object-cover"
+                        className={`object-cover ${isHorizontal ? "h-full w-full" : "mx-auto aspect-[9/16] h-full w-full max-w-48"}`}
                         muted
                         preload="metadata"
                         poster={segment.imageUrl}
@@ -635,75 +645,344 @@ export function VideoFramesPanel({
                       <img
                         src={segment.imageUrl}
                         alt={segment.imagePrompt}
-                        className="absolute inset-0 aspect-[9/16] h-full w-full max-w-48 object-cover"
+                        className={`object-cover ${isHorizontal ? "h-full w-full" : "absolute inset-0 aspect-[9/16] h-full w-full max-w-48"}`}
                       />
                     ) : (
-                      /* Fallback candle image */
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="h-20 w-3 rounded-full bg-gradient-to-t from-yellow-600 via-orange-500 to-red-500 shadow-lg">
-                          {/* Flame effect */}
-                          <div className="relative -top-2 left-1/2 h-3 w-2 -translate-x-1/2 rounded-full bg-gradient-to-t from-orange-400 to-yellow-300 shadow-md"></div>
-                        </div>
+                      /* Fallback indicator */
+                      <div className={`flex items-center justify-center ${isHorizontal ? "h-full w-full bg-gray-200 text-gray-400" : "absolute inset-0"}`}>
+                        {isHorizontal ? (
+                          <span className="text-xs">#{index + 1}</span>
+                        ) : (
+                          <div className="h-20 w-3 rounded-full bg-gradient-to-t from-yellow-600 via-orange-500 to-red-500 shadow-lg">
+                            {/* Flame effect */}
+                            <div className="relative -top-2 left-1/2 h-3 w-2 -translate-x-1/2 rounded-full bg-gradient-to-t from-orange-400 to-yellow-300 shadow-md"></div>
+                          </div>
+                        )}
                       </div>
                     )}
 
                     {/* Regeneration loading overlay */}
                     {isRegenerating === index && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                        <div className="flex flex-col items-center gap-2 text-white">
-                          <RefreshCw className="h-6 w-6 animate-spin" />
-                          <span className="text-xs">Regenerating...</span>
+                        <div className="flex flex-col items-center gap-1 text-white">
+                          <RefreshCw className={`animate-spin ${isHorizontal ? "h-4 w-4" : "h-6 w-6"}`} />
+                          {!isHorizontal && <span className="text-xs">Regenerating...</span>}
                         </div>
                       </div>
                     )}
 
-                    {/* Voice caption indicator */}
-                    <div className="absolute bottom-2 left-2">
-                      <div className="rounded bg-yellow-400 px-1.5 py-0.5 text-xs font-medium text-black">
-                        🗣️ Voice caption
+                    {/* Edit button overlay for horizontal */}
+                    {isHorizontal && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Dialog open={editingState?.index === index} onOpenChange={(open) => !open && setEditingState(null)}>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-white hover:bg-white/20"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(index, segment);
+                              }}
+                              title="Edit segment"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>Edit Segment #{index}</DialogTitle>
+                            </DialogHeader>
+                            
+                            {editingState && (() => {
+                              const currentSegment = segments[editingState.index];
+                              return (
+                                <>
+                            
+                            
+                            {/* Tab Navigation */}
+                            <div className="flex space-x-1 rounded-lg bg-gray-100 p-1">
+                              <button
+                                onClick={() => setActiveTab("image")}
+                                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                                  activeTab === "image"
+                                    ? "bg-white text-blue-600 shadow-sm"
+                                    : "text-gray-600 hover:text-gray-900"
+                                }`}
+                              >
+                                <Image className="h-4 w-4" />
+                                Image
+                              </button>
+                              <button
+                                onClick={() => setActiveTab("script")}
+                                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                                  activeTab === "script"
+                                    ? "bg-white text-blue-600 shadow-sm"
+                                    : "text-gray-600 hover:text-gray-900"
+                                }`}
+                              >
+                                <Mic className="h-4 w-4" />
+                                Script & Voice
+                              </button>
+                            </div>
+
+                            {/* Tab Content */}
+                            <div className="mt-4 space-y-4">
+                              {activeTab === "image" && (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                  {/* Left Column - Image Preview */}
+                                  <div className="space-y-4">
+                                    <div>
+                                      <label className="text-sm font-medium">Current Image</label>
+                                      <div className="mt-2 relative aspect-[9/16] w-full max-w-48 mx-auto overflow-hidden rounded-lg border bg-gray-100">
+                                        {currentSegment.imageUrl ? (
+                                          <img
+                                            src={currentSegment.imageUrl}
+                                            alt={currentSegment.imagePrompt}
+                                            className="absolute inset-0 h-full w-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                                            <div className="text-center">
+                                              <Image className="h-8 w-8 mx-auto mb-2" />
+                                              <div className="text-xs">No image</div>
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Regeneration loading overlay */}
+                                        {isRegenerating === editingState.index && (
+                                          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                                            <div className="flex flex-col items-center gap-2 text-white">
+                                              <RefreshCw className="h-6 w-6 animate-spin" />
+                                              <span className="text-xs">Generating...</span>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Image Metadata */}
+                                      {currentSegment.imageUrl && (
+                                        <div className="mt-2 text-xs text-gray-500 space-y-1">
+                                          <div className="truncate">
+                                            <span className="font-medium">Current prompt:</span> {currentSegment.imagePrompt}
+                                          </div>
+                                          <div>
+                                            <span className="font-medium">Resolution:</span> 1080×1920 (9:16)
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Right Column - Controls */}
+                                  <div className="space-y-4">
+                                    <div>
+                                      <label className="text-sm font-medium">Image Prompt</label>
+                                      <Textarea
+                                        value={editingState?.imagePrompt || ""}
+                                        onChange={(e) => setEditingState(prev => prev ? { ...prev, imagePrompt: e.target.value } : null)}
+                                        placeholder="Enter image prompt..."
+                                        className="mt-2"
+                                        rows={3}
+                                      />
+                                      {editingState?.imagePrompt !== currentSegment.imagePrompt && (
+                                        <div className="mt-1 text-xs text-blue-600">
+                                          ⚡ Prompt modified - click "Regenerate Image" to apply changes
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div>
+                                      <label className="text-sm font-medium">Image Model</label>
+                                      <div className="mt-2 space-y-2">
+                                        {imageModels.map((model) => (
+                                          <div key={model.id} className="flex items-center space-x-2">
+                                            <input
+                                              type="radio"
+                                              id={model.id}
+                                              name="imageModel"
+                                              value={model.id}
+                                              checked={editingState?.imageModel === model.id}
+                                              onChange={(e) => setEditingState(prev => prev ? { ...prev, imageModel: e.target.value } : null)}
+                                              className="h-4 w-4 text-blue-600"
+                                            />
+                                            <label htmlFor={model.id} className="flex-1">
+                                              <div className="text-sm font-medium">{model.name}</div>
+                                              <div className="text-xs text-gray-500">{model.description}</div>
+                                            </label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {activeTab === "script" && (
+                                <div className="space-y-4">
+                                  {/* Current Audio Info */}
+                                  {currentSegment.audioUrl && (
+                                    <div className="rounded-lg bg-gray-50 p-3">
+                                      <div className="text-sm font-medium text-gray-700 mb-2">Current Audio</div>
+                                      <div className="text-xs text-gray-600 space-y-1">
+                                        <div><span className="font-medium">Duration:</span> {formatTime(currentSegment.duration)}</div>
+                                        <div><span className="font-medium">Text:</span> "{currentSegment.text}"</div>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  <div>
+                                    <label className="text-sm font-medium">Script Text</label>
+                                    <Textarea
+                                      value={editingState?.script || ""}
+                                      onChange={(e) => setEditingState(prev => prev ? { ...prev, script: e.target.value } : null)}
+                                      placeholder="Enter script text..."
+                                      className="mt-2"
+                                      rows={4}
+                                    />
+                                    {editingState?.script !== currentSegment.text && (
+                                      <div className="mt-1 text-xs text-blue-600">
+                                        ⚡ Script modified - click "Regenerate Audio" to apply changes
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  <div>
+                                    <label className="text-sm font-medium">Voice</label>
+                                    <div className="mt-2 space-y-2">
+                                      {voiceOptions.map((voice) => (
+                                        <div key={voice.id} className="flex items-center space-x-2">
+                                          <input
+                                            type="radio"
+                                            id={voice.id}
+                                            name="voice"
+                                            value={voice.id}
+                                            checked={editingState?.voice === voice.id}
+                                            onChange={(e) => setEditingState(prev => prev ? { ...prev, voice: e.target.value } : null)}
+                                            className="h-4 w-4 text-blue-600"
+                                          />
+                                          <label htmlFor={voice.id} className="flex-1">
+                                            <div className="text-sm font-medium">{voice.name}</div>
+                                            <div className="text-xs text-gray-500">{voice.description}</div>
+                                          </label>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex justify-end gap-2 pt-4">
+                              <Button variant="outline" onClick={() => setEditingState(null)}>
+                                Cancel
+                              </Button>
+                              {activeTab === "image" && (
+                                <Button 
+                                  onClick={() => editingState && handleRegenerateImage(editingState.index, editingState.imagePrompt, editingState.imageModel)}
+                                  disabled={isRegenerating === index}
+                                >
+                                  {isRegenerating === index ? (
+                                    <>
+                                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                      Generating...
+                                    </>
+                                  ) : (
+                                    "Regenerate Image"
+                                  )}
+                                </Button>
+                              )}
+                              {activeTab === "script" && (
+                                <Button 
+                                  onClick={() => editingState && handleRegenerateAudio(editingState.index, editingState.script, editingState.voice)}
+                                  disabled={isRegenerating === index}
+                                >
+                                  {isRegenerating === index ? (
+                                    <>
+                                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                      Generating...
+                                    </>
+                                  ) : (
+                                    "Regenerate Audio"
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                                </>
+                              )
+                            })()}
+                            </DialogContent>
+                        </Dialog>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Voice caption indicator */}
+                    {!isHorizontal && (
+                      <div className="absolute bottom-2 left-2">
+                        <div className="rounded bg-yellow-400 px-1.5 py-0.5 text-xs font-medium text-black">
+                          🗣️ Voice caption
+                        </div>
+                      </div>
+                    )}
 
                     {/* Duration */}
-                    <div className="absolute bottom-2 right-2">
-                      <div className="rounded bg-black/50 px-1.5 py-0.5 text-xs font-medium text-white">
-                        {formatTime(segment.duration)}
+                    <div className={`absolute ${isHorizontal ? "bottom-1 right-1" : "bottom-2 right-2"}`}>
+                      <div className={`rounded bg-black/50 text-white font-medium ${isHorizontal ? "px-1 py-0.5 text-xs" : "px-1.5 py-0.5 text-xs"}`}>
+                        {isHorizontal ? formatTime(segment.duration).replace('s', '') : formatTime(segment.duration)}
                       </div>
                     </div>
                   </div>
 
                   {/* Caption text */}
-                  <p className="text-xs leading-relaxed text-gray-600">
-                    {segment.text}
-                  </p>
+                  {!isHorizontal && (
+                    <p className="text-xs leading-relaxed text-gray-600">
+                      {segment.text}
+                    </p>
+                  )}
                 </div>
               </div>
             </Card>
 
             {/* Add frame button after each frame */}
-            <div className="mt-3 flex justify-center">
+            {isHorizontal ? (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 rounded-full border-2 border-dashed border-gray-300 p-0 text-gray-400 hover:border-blue-400 hover:text-blue-500"
+                className="h-6 w-6 rounded-full border-2 border-dashed border-gray-300 p-0 text-gray-400 hover:border-blue-400 hover:text-blue-500 flex-shrink-0"
                 onClick={() => handleCreateNewFrame(index)}
-                title={`Add frame after #${index}`}
+                title={`Add segment after #${index}`}
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3 w-3" />
               </Button>
-            </div>
+            ) : (
+              <div className="mt-3 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 rounded-full border-2 border-dashed border-gray-300 p-0 text-gray-400 hover:border-blue-400 hover:text-blue-500"
+                  onClick={() => handleCreateNewFrame(index)}
+                  title={`Add frame after #${index}`}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
           ))}
 
           {/* Legacy add new frame button - kept for compatibility */}
-          <Button
-            variant="outline"
-            className="w-full border-dashed border-gray-300 py-8 text-gray-500 hover:border-gray-400 hover:text-gray-600"
-            onClick={() => handleCreateNewFrame(segments.length - 1)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add new frame
-          </Button>
+          {!isHorizontal && (
+            <Button
+              variant="outline"
+              className="w-full border-dashed border-gray-300 py-8 text-gray-500 hover:border-gray-400 hover:text-gray-600"
+              onClick={() => handleCreateNewFrame(segments.length - 1)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add new frame
+            </Button>
+          )}
         </div>
       </div>
 

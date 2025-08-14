@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import OpenAI from "openai";
 import { parseStructuredOutput, API_SCHEMAS } from "@/lib/api-utils";
-import { getDefaultImageStyle } from "@/lib/image-config";
+import { getDefaultImageStyle, getImageStyle } from "@/lib/image-config";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -18,10 +18,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { chunks, style = "dark and eerie" } = await request.json();
-    
-    // Get the default image style configuration
-    const imageStyle = getDefaultImageStyle();
+    const { chunks, styleId, style = "dark and eerie" } = await request.json();
+
+    // Get the image style configuration from id or fallback
+    const imageStyle =
+      (styleId && getImageStyle(styleId)) || getDefaultImageStyle();
 
     if (!chunks || !Array.isArray(chunks)) {
       return NextResponse.json(

@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ProjectStorage, VideoSegmentData } from "@/lib/project-storage";
-import { getDefaultImageStyle } from "@/lib/image-config";
+import {
+  imageStyles,
+  getDefaultImageStyle,
+  getImageStyle,
+} from "@/lib/image-config";
 import {
   getAudioDurationWithFallback,
   validateSegmentDurations,
@@ -37,7 +41,9 @@ const CreateVideoPage = () => {
   const [selectedVideoType, setSelectedVideoType] = useState("Faceless Video");
   const [script, setScript] = useState("");
   const [selectedMediaType, setSelectedMediaType] = useState("AI Images");
-  const [selectedPreset, setSelectedPreset] = useState("Dark and Eerie");
+  const [selectedStyleId, setSelectedStyleId] = useState(
+    getDefaultImageStyle().id,
+  );
   const [selectedVoice, setSelectedVoice] = useState("echo");
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentStep, setCurrentStep] = useState("");
@@ -53,25 +59,12 @@ const CreateVideoPage = () => {
     // { id: "pov", label: "POV Video", icon: User },
   ];
 
-  const generationPresets = [
-    {
-      id: "dark and eerie",
-      label: "Dark and Eerie",
-      image: "/preset-dark-eerie.jpg",
-      active: true,
-    },
-    // { id: "line-art", label: "Line Art", image: "/preset-line.jpg" },
-    // { id: "cartoon", label: "Cartoon", image: "/preset-cartoon.jpg" },
-    // { id: "collage", label: "Collage", image: "/preset-collage.jpg" },
-    // { id: "kawaii", label: "Kawaii", image: "/preset-kawaii.jpg" },
-    // { id: "cinematic", label: "Cinematic", image: "/preset-cinema.jpg" },
-    // { id: "digital-art", label: "Digital Art", image: "/preset-digital.jpg" },
-    // { id: "neon", label: "Neon Futuristic", image: "/preset-neon.jpg" },
-    // { id: "japanese", label: "Japanese Ink", image: "/preset-japanese.jpg" },
-    // { id: "comic", label: "Comic Book", image: "/preset-comic.jpg" },
-    // { id: "pixel", label: "Pixel Art", image: "/preset-pixel.jpg" },
-    // { id: "retro", label: "Retro", image: "/preset-retro.jpg" },
-  ];
+  const generationPresets = imageStyles.map((style) => ({
+    id: style.id,
+    label: style.name,
+    image: "",
+    active: selectedStyleId === style.id,
+  }));
 
   const handleGenerateVideo = async () => {
     if (!script.trim()) {
@@ -105,7 +98,12 @@ const CreateVideoPage = () => {
       const promptsResponse = await fetch("/api/generate-image-prompts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chunks, style: selectedPreset.toLowerCase() }),
+        body: JSON.stringify({
+          chunks,
+          styleId: selectedStyleId,
+          style:
+            getImageStyle(selectedStyleId)?.name ?? getDefaultImageStyle().name,
+        }),
       });
 
       if (!promptsResponse.ok) {
@@ -138,15 +136,25 @@ const CreateVideoPage = () => {
 
       // Step 3: Generate images for all segments using batch API
       setCurrentStep("Generating all images...");
-      const imageStyle = getDefaultImageStyle();
+      const imageStyle =
+        getImageStyle(selectedStyleId) || getDefaultImageStyle();
 
       // Prepare batch image generation request
       const imagePrompts = segments.map((segment) => {
         const enhancedPrompt = `${imageStyle.systemPrompt}. ${segment.imagePrompt}`;
+        // Map model string from config to service model key
+        const modelKey = imageStyle.model.includes("schnell")
+          ? "flux-schnell"
+          : imageStyle.model.includes("dev")
+            ? "flux-dev"
+            : imageStyle.model.includes("pro")
+              ? "flux-pro"
+              : "flux-schnell";
         return {
           prompt: enhancedPrompt,
-          style: selectedPreset.toLowerCase(),
+          style: imageStyle.name,
           imageSize: "portrait_16_9",
+          model: modelKey,
         };
       });
 
@@ -385,7 +393,7 @@ const CreateVideoPage = () => {
                 {generationPresets.map((preset) => (
                   <button
                     key={preset.id}
-                    onClick={() => setSelectedPreset(preset.label)}
+                    onClick={() => setSelectedStyleId(preset.id)}
                     className={`relative aspect-square overflow-hidden rounded-lg border-2 transition-all ${
                       preset.active
                         ? "border-blue-500 ring-2 ring-blue-200"

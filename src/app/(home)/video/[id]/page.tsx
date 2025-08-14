@@ -14,10 +14,8 @@ import {
   Share,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { VideoFramesPanel } from "@/components/video-editor/video-frames-panel";
 import { VideoPlayerPanel } from "@/components/video-editor/video-player-panel";
 import { VideoEditorHeader } from "@/components/video-editor/video-editor-header";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { VideoGenerationData, VideoSegment, Layer } from "@/types/video";
 import { VIDEO_DATA } from "@/lib/video-mock-data";
 import {
@@ -343,34 +341,20 @@ export default function VideoEditorPage() {
         />
       </div>
 
-      {/* Main Content - Split Layout */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel - Frames for Editing */}
-        <ScrollArea className="h-full max-h-screen">
-          <VideoFramesPanel
-            segments={videoData.video.segments}
-            selectedFrameIndex={selectedFrameIndex}
-            onFrameSelect={setSelectedFrameIndex}
-            currentTime={currentTime}
-            totalDuration={totalDuration}
-            onSegmentUpdate={handleSegmentUpdate}
-            onSegmentInsert={handleSegmentInsert}
-          />
-        </ScrollArea>
-
-        {/* Right Panel - Video Player with Bottom Timeline */}
-        <div className="flex-1">
-          <VideoPlayerPanel
-            video={videoData.video}
-            isPlaying={isPlaying}
-            onPlayPause={() => setIsPlaying(!isPlaying)}
-            currentTime={currentTime}
-            onTimeUpdate={(time: number) => setCurrentTime(time)}
-            totalDuration={totalDuration}
-            selectedFrameIndex={selectedFrameIndex}
-            onFrameSelect={setSelectedFrameIndex}
-          />
-        </div>
+      {/* Main Video Player - Full Width with Bottom Horizontal Segments */}
+      <div className="flex-1">
+        <VideoPlayerPanel
+          video={videoData.video}
+          isPlaying={isPlaying}
+          onPlayPause={() => setIsPlaying(!isPlaying)}
+          currentTime={currentTime}
+          onTimeUpdate={(time: number) => setCurrentTime(time)}
+          totalDuration={totalDuration}
+          selectedFrameIndex={selectedFrameIndex}
+          onFrameSelect={setSelectedFrameIndex}
+          onSegmentUpdate={handleSegmentUpdate}
+          onSegmentInsert={handleSegmentInsert}
+        />
       </div>
     </div>
   );
