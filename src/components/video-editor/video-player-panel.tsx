@@ -8,10 +8,12 @@ import {
   RotateCcw,
   RotateCw,
   Volume2,
+  VolumeX,
   Maximize,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoComposition } from "@/components/video-editor/video-composition";
+import { ExternalAudioPlayer } from "@/components/video-editor/external-audio-player";
 import type { Video, VideoSegment } from "@/types/video";
 
 interface VideoPlayerPanelProps {
@@ -33,6 +35,7 @@ export function VideoPlayerPanel({
 }: VideoPlayerPanelProps) {
   const playerRef = useRef<any>(null);
   const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Calculate frame number for display
   const fps = 30;
@@ -58,12 +61,12 @@ export function VideoPlayerPanel({
     }
   }, [currentTime, fps]);
 
-  // Update Remotion player volume
+  // Mute Remotion player since audio is handled externally
   useEffect(() => {
     if (playerRef.current) {
-      playerRef.current.setVolume(volume);
+      playerRef.current.setVolume(0); // Always mute Remotion player
     }
-  }, [volume]);
+  }, []);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -88,7 +91,8 @@ export function VideoPlayerPanel({
           if (newTime <= totalDuration) {
             onTimeUpdate(newTime);
           } else {
-            // Video ended
+            // Video ended - pause playback and reset time
+            onPlayPause(); // This will set isPlaying to false, stopping all audio
             onTimeUpdate(0);
           }
         } catch (error) {
@@ -103,7 +107,18 @@ export function VideoPlayerPanel({
 
   return (
     <div className="flex flex-1 flex-col bg-gray-50">
-      {/* Video Player Area - Audio is now handled by Remotion */}
+      {/* External Audio Player - Handles all audio playback */}
+      <ExternalAudioPlayer
+        segments={video.segments}
+        isPlaying={isPlaying}
+        currentTime={currentTime}
+        backgroundMusicUrl="/demo/temporex.mp3"
+        fps={fps}
+        volume={volume}
+        isMuted={isMuted}
+      />
+
+      {/* Video Player Area - Visual only, audio handled externally */}
       <div className="flex h-full flex-1 items-center justify-center p-8">
         <div className="relative h-full">
           {/* Video Container */}
@@ -128,7 +143,7 @@ export function VideoPlayerPanel({
               loop={false}
               allowFullscreen
               doubleClickToFullscreen
-              showVolumeControls={true}
+              showVolumeControls={false}
               spaceKeyToPlayOrPause={false}
             />
 
@@ -189,17 +204,32 @@ export function VideoPlayerPanel({
               </Button>
 
               <div className="flex items-center gap-2 text-sm">
-                <Volume2 className="h-4 w-4" />
+                <Button
+                  onClick={() => setIsMuted(!isMuted)}
+                  variant="ghost"
+                  size="sm"
+                  className="p-1"
+                >
+                  {isMuted ? (
+                    <VolumeX className="h-4 w-4" />
+                  ) : (
+                    <Volume2 className="h-4 w-4" />
+                  )}
+                </Button>
                 <input
                   type="range"
                   min="0"
                   max="1"
                   step="0.1"
-                  value={volume}
-                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => {
+                    const newVolume = parseFloat(e.target.value);
+                    setVolume(newVolume);
+                    setIsMuted(newVolume === 0);
+                  }}
                   className="w-16"
                 />
-                <span>{Math.round(volume * 100)}%</span>
+                <span>{Math.round((isMuted ? 0 : volume) * 100)}%</span>
               </div>
             </div>
 

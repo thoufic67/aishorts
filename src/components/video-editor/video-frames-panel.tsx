@@ -14,6 +14,7 @@ interface VideoFramesPanelProps {
   currentTime: number;
   totalDuration: number;
   onSegmentUpdate?: (index: number, updatedSegment: VideoSegment) => void;
+  onSegmentInsert?: (index: number, newSegment: VideoSegment) => void;
 }
 
 function formatTime(seconds: number): string {
@@ -33,6 +34,14 @@ interface EditingState {
   voice: string;
 }
 
+interface NewFrameState {
+  insertAfterIndex: number;
+  script: string;
+  voice: string;
+  imageModel: string;
+  isGenerating: boolean;
+}
+
 export function VideoFramesPanel({
   segments,
   selectedFrameIndex,
@@ -40,8 +49,10 @@ export function VideoFramesPanel({
   currentTime,
   totalDuration,
   onSegmentUpdate,
+  onSegmentInsert,
 }: VideoFramesPanelProps) {
   const [editingState, setEditingState] = useState<EditingState | null>(null);
+  const [newFrameState, setNewFrameState] = useState<NewFrameState | null>(null);
   const [isRegenerating, setIsRegenerating] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<EditMode>("image");
 
@@ -159,6 +170,150 @@ export function VideoFramesPanel({
       setEditingState(null);
     }
   };
+
+  // Generate image prompt from script
+  const generateImagePrompt = async (script: string): Promise<string> => {
+    try {
+      const response = await fetch("/api/generate-image-prompt", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: script,
+          style: "dark_eerie_survival", // Use the existing style
+        }),
+      });
+
+      if (response.ok) {
+        const { imagePrompt } = await response.json();
+        return imagePrompt;
+      } else {
+        console.error("Failed to generate image prompt");
+        return `Dark, eerie scene representing: ${script}`;
+      }
+    } catch (error) {
+      console.error("Error generating image prompt:", error);
+      return `Dark, eerie scene representing: ${script}`;
+    }
+  };
+
+  // Handle new frame creation
+  const handleCreateNewFrame = (insertAfterIndex: number) => {
+    setNewFrameState({
+      insertAfterIndex,
+      script: "",
+      voice: "echo",
+      imageModel: "flux-schnell",
+      isGenerating: false,
+    });
+  };
+
+  // Count words in script
+  const countWords = (text: string): number => {
+    return text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
+  };
+
+  // Generate new frame with all assets
+  const handleGenerateNewFrame = async () => {
+    if (!newFrameState || !onSegmentInsert) return;
+
+    // Validate script length (max 50 words)
+    const wordCount = countWords(newFrameState.script);
+    if (wordCount > 50) {
+      alert("Script must be 50 words or less. Current count: " + wordCount);
+      return;
+    }
+
+    if (!newFrameState.script.trim()) {
+      alert("Please enter a script for the new frame.");
+      return;
+    }
+
+    setNewFrameState(prev => prev ? { ...prev, isGenerating: true } : null);
+
+    try {
+      // Step 1: Generate image prompt
+      const imagePrompt = await generateImagePrompt(newFrameState.script);
+
+      // Step 2: Generate image
+      const imageResponse = await fetch("/api/generate-images", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: "single",
+          prompt: imagePrompt,
+          model: newFrameState.imageModel,
+        }),
+      });
+
+      const imageResult = await imageResponse.json();
+      if (!imageResult.success) {
+        throw new Error("Failed to generate image: " + imageResult.error);
+      }
+
+      // Step 3: Generate audio
+      const audioResponse = await fetch("/api/text-to-speech", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: newFrameState.script,
+          voice: newFrameState.voice,
+          index: newFrameState.insertAfterIndex + 1,
+        }),
+      });
+
+      if (!audioResponse.ok) {
+        const error = await audioResponse.json();
+        throw new Error("Failed to generate audio: " + error.error);
+      }
+
+      const { audioUrl } = await audioResponse.json();
+
+      // Get actual audio duration
+      let actualDuration: number;
+      try {
+        actualDuration = await getAudioDuration(audioUrl);
+      } catch (error) {
+        console.warn("Could not get actual duration, using estimate:", error);
+        actualDuration = estimateAudioDuration(newFrameState.script);
+      }
+
+      // Step 4: Create new segment
+      const newSegment: VideoSegment = {
+        _id: `segment_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+        text: newFrameState.script,
+        imagePrompt: imagePrompt,
+        imageUrl: imageResult.imageUrl,
+        audioUrl: audioUrl,
+        audioVolume: 1,
+        playBackRate: 1,
+        duration: actualDuration,
+        withBlur: false,
+        backgroundMinimized: false,
+        order: newFrameState.insertAfterIndex + 1,
+        media: [],
+        wordTimings: [],
+        elements: [],
+      };
+
+      // Step 5: Insert new segment
+      onSegmentInsert(newFrameState.insertAfterIndex, newSegment);
+
+      // Close modal
+      setNewFrameState(null);
+    } catch (error) {
+      console.error("Error creating new frame:", error);
+      alert("Error creating new frame: " + (error as Error).message);
+    } finally {
+      setNewFrameState(prev => prev ? { ...prev, isGenerating: false } : null);
+    }
+  };
+
   return (
     <div className="w-80 border-r bg-white">
       {/* Header */}
@@ -178,15 +333,30 @@ export function VideoFramesPanel({
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-3">
           {segments.map((segment, index) => (
-            <Card
-              key={segment._id}
-              className={`cursor-pointer border transition-all ${
-                selectedFrameIndex === index
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-200 hover:border-gray-300"
-              }`}
-              onClick={() => onFrameSelect(index)}
-            >
+            <div key={`frame-group-${index}`}>
+              {/* Add frame button before first frame */}
+              {index === 0 && (
+                <div className="mb-3 flex justify-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 rounded-full border-2 border-dashed border-gray-300 p-0 text-gray-400 hover:border-blue-400 hover:text-blue-500"
+                    onClick={() => handleCreateNewFrame(-1)}
+                    title="Add frame at beginning"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              
+              <Card
+                className={`cursor-pointer border transition-all ${
+                  selectedFrameIndex === index
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+                onClick={() => onFrameSelect(index)}
+              >
               <div className="p-3">
                 {/* Frame header */}
                 <div className="mb-2 flex items-center justify-between">
@@ -507,18 +677,161 @@ export function VideoFramesPanel({
                 </div>
               </div>
             </Card>
+
+            {/* Add frame button after each frame */}
+            <div className="mt-3 flex justify-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 rounded-full border-2 border-dashed border-gray-300 p-0 text-gray-400 hover:border-blue-400 hover:text-blue-500"
+                onClick={() => handleCreateNewFrame(index)}
+                title={`Add frame after #${index}`}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
           ))}
 
-          {/* Add new frame button */}
+          {/* Legacy add new frame button - kept for compatibility */}
           <Button
             variant="outline"
             className="w-full border-dashed border-gray-300 py-8 text-gray-500 hover:border-gray-400 hover:text-gray-600"
+            onClick={() => handleCreateNewFrame(segments.length - 1)}
           >
             <Plus className="mr-2 h-4 w-4" />
             Add new frame
           </Button>
         </div>
       </div>
+
+      {/* New Frame Creation Modal */}
+      <Dialog open={!!newFrameState} onOpenChange={(open) => !open && setNewFrameState(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Add New Frame 
+              {newFrameState && newFrameState.insertAfterIndex >= 0 
+                ? ` After #${newFrameState.insertAfterIndex}` 
+                : ' At Beginning'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {newFrameState && (
+            <div className="space-y-4">
+              {/* Script Input */}
+              <div>
+                <label className="text-sm font-medium">
+                  Script (max 50 words)
+                  <span className="ml-2 text-xs text-gray-500">
+                    {countWords(newFrameState.script)}/50 words
+                  </span>
+                </label>
+                <Textarea
+                  value={newFrameState.script}
+                  onChange={(e) => setNewFrameState(prev => prev ? { ...prev, script: e.target.value } : null)}
+                  placeholder="Enter script text for the new frame..."
+                  className={`mt-2 ${countWords(newFrameState.script) > 50 ? 'border-red-500' : ''}`}
+                  rows={4}
+                />
+                {countWords(newFrameState.script) > 50 && (
+                  <div className="mt-1 text-xs text-red-600">
+                    ⚠️ Script exceeds 50 word limit
+                  </div>
+                )}
+              </div>
+
+              {/* Voice Selection */}
+              <div>
+                <label className="text-sm font-medium">Voice</label>
+                <div className="mt-2 space-y-2">
+                  {voiceOptions.slice(0, 3).map((voice) => (
+                    <div key={voice.id} className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id={`new-${voice.id}`}
+                        name="newVoice"
+                        value={voice.id}
+                        checked={newFrameState.voice === voice.id}
+                        onChange={(e) => setNewFrameState(prev => prev ? { ...prev, voice: e.target.value } : null)}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <label htmlFor={`new-${voice.id}`} className="flex-1">
+                        <div className="text-sm font-medium">{voice.name}</div>
+                        <div className="text-xs text-gray-500">{voice.description}</div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Image Model Selection */}
+              <div>
+                <label className="text-sm font-medium">Image Quality</label>
+                <div className="mt-2 space-y-2">
+                  {imageModels.map((model) => (
+                    <div key={model.id} className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id={`new-${model.id}`}
+                        name="newImageModel"
+                        value={model.id}
+                        checked={newFrameState.imageModel === model.id}
+                        onChange={(e) => setNewFrameState(prev => prev ? { ...prev, imageModel: e.target.value } : null)}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <label htmlFor={`new-${model.id}`} className="flex-1">
+                        <div className="text-sm font-medium">{model.name}</div>
+                        <div className="text-xs text-gray-500">{model.description}</div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Generation Progress */}
+              {newFrameState.isGenerating && (
+                <div className="rounded-lg bg-blue-50 p-3">
+                  <div className="flex items-center gap-2 text-blue-700">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span className="text-sm font-medium">Generating frame...</span>
+                  </div>
+                  <div className="mt-1 text-xs text-blue-600">
+                    Creating image prompt → Generating image → Creating audio
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setNewFrameState(null)}
+                  disabled={newFrameState.isGenerating}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleGenerateNewFrame}
+                  disabled={newFrameState.isGenerating || countWords(newFrameState.script) > 50 || !newFrameState.script.trim()}
+                >
+                  {newFrameState.isGenerating ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Generate Frame
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

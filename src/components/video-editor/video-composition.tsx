@@ -10,159 +10,21 @@ import {
   useVideoConfig,
   interpolate,
   Sequence,
-  Audio,
-  staticFile,
 } from "remotion";
 import type {
   Video as VideoType,
   VideoSegment,
   WordTiming,
 } from "@/types/video";
-import { SingleAudioSequence } from "./audio-single-sequence";
 
 interface VideoCompositionProps {
   video: VideoType;
-  useSingleAudio?: boolean; // Option to use single audio approach for better performance
 }
 
-interface AudioSequencesProps {
-  segments: VideoSegment[];
-  fps: number;
-}
-
-// Audio compression function to prevent volume spikes and distortion
-const compressVolume = (volume: number, threshold = 0.7, ratio = 3): number => {
-  if (volume <= threshold) return volume;
-  const excess = volume - threshold;
-  return threshold + excess / ratio;
-};
-
-const AudioSequences: React.FC<AudioSequencesProps> = React.memo(
-  ({ segments, fps }) => {
-    const currentFrame = useCurrentFrame();
-
-    // Get audio segments to render (windowed approach for performance)
-    const getAudioSegmentsToRender = React.useMemo(() => {
-      // Find current segment index based on frame position
-      let cumulativeFrames = 0;
-      let currentSegmentIndex = -1;
-
-      for (let i = 0; i < segments.length; i++) {
-        const segmentFrames = Math.round(segments[i].duration * fps);
-        if (
-          currentFrame >= cumulativeFrames &&
-          currentFrame < cumulativeFrames + segmentFrames
-        ) {
-          currentSegmentIndex = i;
-          break;
-        }
-        cumulativeFrames += segmentFrames;
-      }
-
-      // If frame is past all segments, use last segment
-      if (currentSegmentIndex === -1) {
-        currentSegmentIndex = segments.length - 1;
-      }
-
-      // Render current segment ± 1 adjacent (windowed approach)
-      const windowSize = 1;
-      const startIndex = Math.max(0, currentSegmentIndex - windowSize);
-      const endIndex = Math.min(
-        segments.length - 1,
-        currentSegmentIndex + windowSize,
-      );
-
-      return segments
-        .slice(startIndex, endIndex + 1)
-        .map((segment, relativeIndex) => ({
-          segment,
-          originalIndex: startIndex + relativeIndex,
-        }));
-    }, [segments, fps, currentFrame]);
-
-    // Memoize frame calculations for windowed segments
-    const segmentFrameData = React.useMemo(() => {
-      return getAudioSegmentsToRender.map(({ segment, originalIndex }) => {
-        const segmentFrames = Math.round(segment.duration * fps);
-        const startFrame = segments
-          .slice(0, originalIndex)
-          .reduce((acc, seg) => acc + Math.round(seg.duration * fps), 0);
-        return { segment, segmentFrames, startFrame, index: originalIndex };
-      });
-    }, [getAudioSegmentsToRender, segments, fps]);
-
-    return (
-      <>
-        {segmentFrameData.map(
-          ({ segment, segmentFrames, startFrame, index }) => {
-            return segment.audioUrl ? (
-              <Sequence
-                key={`audio-${segment._id}`}
-                from={startFrame}
-                durationInFrames={segmentFrames}
-                name={`Voice Segment ${index + 1}`}
-              >
-                <Audio
-                  src={segment.audioUrl}
-                  volume={(frame) => {
-                    // Significantly reduced voice volume to prevent distortion
-                    const maxVoiceVolume = 0.65; // Reduced from 0.85
-                    const baseVolume = Math.min(
-                      segment.audioVolume || 0.75, // Reduced from 0.9
-                      maxVoiceVolume,
-                    );
-
-                    // Apply compression to prevent volume spikes
-                    const targetVolume = compressVolume(baseVolume);
-
-                    // Extended fade in for smoother transitions
-                    const fadeInFrames = 9; // Increased from 6
-                    if (frame < fadeInFrames) {
-                      const fadeVolume = interpolate(
-                        frame,
-                        [0, fadeInFrames],
-                        [0, targetVolume],
-                        {
-                          extrapolateLeft: "clamp",
-                          extrapolateRight: "clamp",
-                        },
-                      );
-                      return compressVolume(fadeVolume);
-                    }
-
-                    // Extended fade out for smoother transitions
-                    const fadeOutFrames = 9; // Increased from 6
-                    const fadeOutStart = segmentFrames - fadeOutFrames;
-                    if (frame > fadeOutStart) {
-                      const fadeVolume = interpolate(
-                        frame,
-                        [fadeOutStart, segmentFrames],
-                        [targetVolume, 0],
-                        {
-                          extrapolateLeft: "clamp",
-                          extrapolateRight: "clamp",
-                        },
-                      );
-                      return compressVolume(fadeVolume);
-                    }
-
-                    return targetVolume;
-                  }}
-                  name={`Voice: "${segment.text.substring(0, 30)}..."`}
-                  acceptableTimeShiftInSeconds={0.05}
-                />
-              </Sequence>
-            ) : null;
-          },
-        )}
-      </>
-    );
-  },
-);
+// Audio playback has been moved to ExternalAudioPlayer component for better performance
 
 export const VideoComposition: React.FC<VideoCompositionProps> = ({
   video,
-  useSingleAudio = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -435,70 +297,7 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({
         );
       })}
 
-      {/* Background Music - Loops for entire video duration */}
-      <Audio
-        src={staticFile("demo/temporex.mp3")}
-        volume={(frame) => {
-          // Check if any voice audio is currently playing for ducking
-          const getCurrentSegment = () => {
-            let cumulativeFrames = 0;
-            for (const segment of video.segments) {
-              const segmentFrames = Math.round(segment.duration * fps);
-              const segmentEndFrame = cumulativeFrames + segmentFrames;
-              if (frame >= cumulativeFrames && frame < segmentEndFrame) {
-                return segment;
-              }
-              cumulativeFrames = segmentEndFrame;
-            }
-            return null;
-          };
-
-          const currentSegment = getCurrentSegment();
-          const baseVolume = currentSegment?.audioUrl ? 0.03 : 0.08; // Reduced duck volume to prevent conflicts
-
-          // Smooth fade in at the beginning
-          const fadeInFrames = 30; // 1 second at 30fps
-          if (frame < fadeInFrames) {
-            return interpolate(frame, [0, fadeInFrames], [0, baseVolume], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            });
-          }
-
-          // Calculate total duration in frames
-          const totalDurationInSeconds = video.segments.reduce(
-            (acc, segment) => acc + (segment.duration || 5),
-            0,
-          );
-          const totalFrames = Math.round(totalDurationInSeconds * fps);
-
-          // Smooth fade out at the end
-          const fadeOutStart = totalFrames - 30; // Last 1 second
-          if (frame > fadeOutStart) {
-            return interpolate(
-              frame,
-              [fadeOutStart, totalFrames],
-              [baseVolume, 0],
-              {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              },
-            );
-          }
-
-          return baseVolume;
-        }}
-        loop
-        name="Background Music"
-        acceptableTimeShiftInSeconds={0.1}
-      />
-
-      {/* Voice Audio Sequences - Choose between windowed or single audio approach */}
-      {useSingleAudio ? (
-        <SingleAudioSequence segments={video.segments} fps={fps} />
-      ) : (
-        <AudioSequences segments={video.segments} fps={fps} />
-      )}
+      {/* Audio playback has been moved to ExternalAudioPlayer component for better performance */}
 
       {/* Dynamic Captions with Word-by-Word Timing */}
       <AbsoluteFill

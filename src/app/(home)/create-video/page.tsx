@@ -6,7 +6,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ProjectStorage, VideoSegmentData } from "@/lib/project-storage";
 import { getDefaultImageStyle } from "@/lib/image-config";
-import { getAudioDuration, estimateAudioDuration } from "@/lib/audio-utils";
+import {
+  getAudioDurationWithFallback,
+  validateSegmentDurations,
+} from "@/lib/audio-utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -138,7 +141,7 @@ const CreateVideoPage = () => {
       const imageStyle = getDefaultImageStyle();
 
       // Prepare batch image generation request
-      const imagePrompts = segments.map(segment => {
+      const imagePrompts = segments.map((segment) => {
         const enhancedPrompt = `${imageStyle.systemPrompt}. ${segment.imagePrompt}`;
         return {
           prompt: enhancedPrompt,
@@ -173,7 +176,9 @@ const CreateVideoPage = () => {
             ProjectStorage.updateSegmentImage(projectId, i, result.imageUrl);
           }
         }
-        setCurrentStep(`Generated ${batchImageResult.totalGenerated} of ${batchImageResult.totalRequested} images`);
+        setCurrentStep(
+          `Generated ${batchImageResult.totalGenerated} of ${batchImageResult.totalRequested} images`,
+        );
       }
 
       // Step 4: Generate audio for each segment
@@ -194,24 +199,19 @@ const CreateVideoPage = () => {
 
         if (audioResponse.ok) {
           const { audioUrl } = await audioResponse.json();
-          
+
           // Update progress for audio generation completion
           setProgress(70 + (i + 0.5) * (30 / segments.length));
           setCurrentStep(`Getting audio duration for segment ${i + 1}...`);
-          
-          // Get actual audio duration
-          let actualDuration: number;
-          try {
-            // Try to get the actual audio duration
-            actualDuration = await getAudioDuration(audioUrl);
-            console.log(`Segment ${i} actual duration: ${actualDuration.toFixed(2)}s`);
-          } catch (error) {
-            // Fallback to estimated duration if we can't get actual duration
-            console.warn(`Could not get actual duration for segment ${i}, using estimate:`, error);
-            actualDuration = estimateAudioDuration(segment.text);
-            console.log(`Segment ${i} estimated duration: ${actualDuration.toFixed(2)}s`);
-          }
-          
+
+          // Get actual audio duration with improved reliability
+          const actualDuration = await getAudioDurationWithFallback(
+            audioUrl,
+            segment.text,
+            selectedVoice,
+          );
+          console.log(`Segment ${i} duration: ${actualDuration.toFixed(2)}s`);
+
           ProjectStorage.updateSegmentAudio(
             projectId,
             i,
@@ -221,6 +221,28 @@ const CreateVideoPage = () => {
         }
 
         setProgress(70 + (i + 1) * (30 / segments.length));
+      }
+
+      // Validate all segment durations before completing
+      const finalProject = ProjectStorage.getProject(projectId);
+      if (finalProject?.segments) {
+        const isValid = validateSegmentDurations(finalProject.segments);
+        if (!isValid) {
+          console.warn(
+            "Some segments had invalid durations, they have been fixed with estimates",
+          );
+          // Save the fixed durations
+          ProjectStorage.saveProject(finalProject);
+        }
+
+        // Log total video duration for debugging
+        const totalDuration = finalProject.segments.reduce(
+          (acc, seg) => acc + (seg.duration || 0),
+          0,
+        );
+        console.log(
+          `Total video duration: ${totalDuration.toFixed(2)}s for ${finalProject.segments.length} segments`,
+        );
       }
 
       setCurrentStep("Video creation complete!");
@@ -380,7 +402,7 @@ const CreateVideoPage = () => {
             </div>
 
             {/* Voice Selection */}
-            <VoiceSelection 
+            <VoiceSelection
               selectedVoice={selectedVoice}
               onVoiceSelect={setSelectedVoice}
             />
