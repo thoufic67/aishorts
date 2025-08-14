@@ -17,13 +17,12 @@ import { Button } from "@/components/ui/button";
 import { VideoFramesPanel } from "@/components/video-editor/video-frames-panel";
 import { VideoPlayerPanel } from "@/components/video-editor/video-player-panel";
 import { VideoEditorHeader } from "@/components/video-editor/video-editor-header";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { VideoGenerationData, VideoSegment, Layer } from "@/types/video";
 import { VIDEO_DATA } from "@/lib/video-mock-data";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ProjectStorage,
   type ProjectData,
-  type VideoSegmentData,
 } from "@/lib/project-storage";
 
 // Convert ProjectData to VideoGenerationData format
@@ -197,45 +196,6 @@ export default function VideoEditorPage() {
     }
   };
 
-  const handleExport = async (quality: string) => {
-    if (!videoData) return;
-
-    try {
-      const response = await fetch("/api/export-video-with-audio", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          videoData: videoData.video,
-          backgroundMusicUrl: "/demo/temporex.mp3",
-          quality,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Export failed");
-      }
-
-      const result = await response.json();
-
-      // Trigger download
-      const link = document.createElement("a");
-      link.href = result.downloadUrl;
-      link.download = result.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Show success message
-      alert("Video exported successfully!");
-    } catch (error) {
-      console.error("Export failed:", error);
-      alert(
-        `Export failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
-  };
-
   const handleSegmentInsert = (
     insertAfterIndex: number,
     newSegment: VideoSegment,
@@ -284,6 +244,46 @@ export default function VideoEditorPage() {
     // Select the newly inserted frame
     setSelectedFrameIndex(insertIndex);
   };
+
+  const handleExport = async (quality: string) => {
+    if (!videoData) return;
+
+    try {
+      const response = await fetch("/api/export-video-with-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoData: videoData.video,
+          backgroundMusicUrl: "/demo/temporex.mp3",
+          quality,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Export failed");
+      }
+
+      const result = await response.json();
+
+      // Trigger download
+      const link = document.createElement("a");
+      link.href = result.downloadUrl;
+      link.download = result.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Show success message
+      alert("Video exported successfully!");
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert(
+        `Export failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+  };
+
 
   useEffect(() => {
     // Try to load from project storage first
@@ -343,9 +343,10 @@ export default function VideoEditorPage() {
         />
       </div>
 
-      <div className="flex flex-1">
-        <ScrollArea className="h-full max-h-dvh">
-          {/* Left Panel - Frames */}
+      {/* Main Content - Split Layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel - Frames for Editing */}
+        <ScrollArea className="h-full max-h-screen">
           <VideoFramesPanel
             segments={videoData.video.segments}
             selectedFrameIndex={selectedFrameIndex}
@@ -357,15 +358,19 @@ export default function VideoEditorPage() {
           />
         </ScrollArea>
 
-        {/* Right Panel - Video Player */}
-        <VideoPlayerPanel
-          video={videoData.video}
-          isPlaying={isPlaying}
-          onPlayPause={() => setIsPlaying(!isPlaying)}
-          currentTime={currentTime}
-          onTimeUpdate={setCurrentTime}
-          totalDuration={totalDuration}
-        />
+        {/* Right Panel - Video Player with Bottom Timeline */}
+        <div className="flex-1">
+          <VideoPlayerPanel
+            video={videoData.video}
+            isPlaying={isPlaying}
+            onPlayPause={() => setIsPlaying(!isPlaying)}
+            currentTime={currentTime}
+            onTimeUpdate={(time: number) => setCurrentTime(time)}
+            totalDuration={totalDuration}
+            selectedFrameIndex={selectedFrameIndex}
+            onFrameSelect={setSelectedFrameIndex}
+          />
+        </div>
       </div>
     </div>
   );

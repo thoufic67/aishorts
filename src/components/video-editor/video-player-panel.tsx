@@ -5,8 +5,6 @@ import { Player } from "@remotion/player";
 import {
   Play,
   Pause,
-  RotateCcw,
-  RotateCw,
   Volume2,
   VolumeX,
   Maximize,
@@ -23,6 +21,8 @@ interface VideoPlayerPanelProps {
   currentTime: number;
   onTimeUpdate: (time: number) => void;
   totalDuration: number;
+  selectedFrameIndex: number;
+  onFrameSelect: (index: number) => void;
 }
 
 export function VideoPlayerPanel({
@@ -32,6 +32,8 @@ export function VideoPlayerPanel({
   currentTime,
   onTimeUpdate,
   totalDuration,
+  selectedFrameIndex,
+  onFrameSelect,
 }: VideoPlayerPanelProps) {
   const playerRef = useRef<any>(null);
   const [volume, setVolume] = useState(1);
@@ -40,7 +42,6 @@ export function VideoPlayerPanel({
   // Calculate frame number for display
   const fps = 30;
   const totalFrames = Math.floor(totalDuration * fps);
-  const currentFrame = Math.floor(currentTime * fps);
 
   // Sync the Remotion player with our play/pause state
   useEffect(() => {
@@ -74,10 +75,34 @@ export function VideoPlayerPanel({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const formatRatio = (current: number, total: number): string => {
-    const ratio = total > 0 ? current / total : 0;
-    return `${(ratio * 100).toFixed(1)}%`;
+
+  // Calculate which segment is currently active based on currentTime
+  const getCurrentSegmentIndex = (): number => {
+    let totalTime = 0;
+    for (let i = 0; i < video.segments.length; i++) {
+      totalTime += video.segments[i].duration;
+      if (currentTime <= totalTime) {
+        return i;
+      }
+    }
+    return Math.max(0, video.segments.length - 1);
   };
+
+  // Calculate time offset for a specific segment
+  const getSegmentTimeOffset = (segmentIndex: number): number => {
+    return video.segments
+      .slice(0, segmentIndex)
+      .reduce((acc, segment) => acc + segment.duration, 0);
+  };
+
+  // Handle segment click
+  const handleSegmentClick = (segmentIndex: number) => {
+    const segmentStartTime = getSegmentTimeOffset(segmentIndex);
+    onTimeUpdate(segmentStartTime);
+    onFrameSelect(segmentIndex);
+  };
+
+  const currentSegmentIndex = getCurrentSegmentIndex();
 
   // Create a timer to update currentTime when playing
   useEffect(() => {
@@ -106,7 +131,7 @@ export function VideoPlayerPanel({
   }, [isPlaying, fps, totalDuration, onTimeUpdate]);
 
   return (
-    <div className="flex flex-1 flex-col bg-gray-50">
+    <div className="flex h-full w-full flex-1 flex-col">
       {/* External Audio Player - Handles all audio playback */}
       <ExternalAudioPlayer
         segments={video.segments}
@@ -118,13 +143,14 @@ export function VideoPlayerPanel({
         isMuted={isMuted}
       />
 
-      {/* Video Player Area - Visual only, audio handled externally */}
-      <div className="flex h-full flex-1 items-center justify-center p-8">
-        <div className="relative h-full">
+      {/* Video Player Area */}
+      <div className="flex h-full flex-1 items-center justify-center p-4">
+        <div className="relative h-full max-w-sm">
           {/* Video Container */}
-          <div className="w-90 relative aspect-[9/16] h-full overflow-hidden rounded-lg bg-black shadow-xl">
+          <div className="relative aspect-[9/16] h-full max-h-[70vh] overflow-hidden rounded-2xl bg-black shadow-2xl">
             {/* Remotion Player */}
             <Player
+              className="h-80 w-full"
               ref={playerRef}
               component={VideoComposition}
               durationInFrames={totalFrames}
@@ -153,7 +179,7 @@ export function VideoPlayerPanel({
                 <Button
                   onClick={onPlayPause}
                   size="lg"
-                  className="h-16 w-16 rounded-full bg-white/20 p-0 text-white backdrop-blur-sm hover:bg-white/30"
+                  className="bg-default/20 text-default hover:bg-default/30 h-16 w-16 rounded-full p-0 backdrop-blur-sm"
                 >
                   <Play className="ml-1 h-8 w-8" />
                 </Button>
@@ -163,52 +189,31 @@ export function VideoPlayerPanel({
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="border-t bg-white p-4">
-        <div className="mx-auto max-w-2xl space-y-4">
-          {/* Progress Bar */}
-          <div className="relative">
-            <div className="h-2 w-full rounded-full bg-gray-200">
-              <div
-                className="h-2 rounded-full bg-blue-500 transition-all duration-150"
-                style={{ width: `${(currentTime / totalDuration) * 100}%` }}
-              />
-            </div>
-            <div
-              className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-blue-500 shadow-md"
-              style={{ left: `${(currentTime / totalDuration) * 100}%` }}
-            />
-          </div>
-
-          {/* Control Buttons */}
+      {/* Bottom Controls and Segment Timeline */}
+      <div className="p-4">
+        <div className="mx-auto max-w-4xl space-y-4">
+          {/* Playback Controls */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Button
                 onClick={onPlayPause}
                 size="sm"
-                className="flex items-center gap-2"
+                variant="ghost"
+                className="text-default hover:bg-default/20 h-10 w-10 rounded-full bg-white/10"
               >
                 {isPlaying ? (
-                  <Pause className="h-4 w-4" />
+                  <Pause className="h-5 w-5" />
                 ) : (
-                  <Play className="h-4 w-4" />
+                  <Play className="ml-0.5 h-5 w-5" />
                 )}
               </Button>
 
-              <Button variant="ghost" size="sm">
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-
-              <Button variant="ghost" size="sm">
-                <RotateCw className="h-4 w-4" />
-              </Button>
-
-              <div className="flex items-center gap-2 text-sm">
+              <div className="text-default/70 flex items-center gap-2 text-sm">
                 <Button
                   onClick={() => setIsMuted(!isMuted)}
                   variant="ghost"
                   size="sm"
-                  className="p-1"
+                  className="text-default/70 hover:text-default"
                 >
                   {isMuted ? (
                     <VolumeX className="h-4 w-4" />
@@ -227,28 +232,97 @@ export function VideoPlayerPanel({
                     setVolume(newVolume);
                     setIsMuted(newVolume === 0);
                   }}
-                  className="w-16"
+                  className="w-20 accent-blue-500"
                 />
-                <span>{Math.round((isMuted ? 0 : volume) * 100)}%</span>
               </div>
             </div>
 
             {/* Time Display */}
-            <div className="flex items-center gap-4 font-mono text-sm">
+            <div className="text-default/70 flex items-center gap-4 font-mono text-sm">
               <span>
                 {formatTime(currentTime)} / {formatTime(totalDuration)}
               </span>
-              <span className="text-gray-500">
-                Frame {currentFrame} / {totalFrames}
-              </span>
-              <span className="text-gray-500">
-                {formatRatio(currentTime, totalDuration)}
-              </span>
             </div>
 
-            <Button variant="ghost" size="sm">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-default/70 hover:text-default"
+            >
               <Maximize className="h-4 w-4" />
             </Button>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="relative">
+            <div className="bg-default/20 h-1 w-full rounded-full">
+              <div
+                className="h-1 rounded-full bg-blue-500 transition-all duration-150"
+                style={{ width: `${(currentTime / totalDuration) * 100}%` }}
+              />
+            </div>
+            <div
+              className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-blue-500 shadow-md"
+              style={{ left: `${(currentTime / totalDuration) * 100}%` }}
+            />
+          </div>
+
+          {/* Segment Timeline */}
+          <div className="space-y-2">
+            <div className="text-default/50 flex items-center gap-2 text-sm">
+              <span>Segments</span>
+              <div className="h-px flex-1 bg-muted" />
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {video.segments.map((segment, index) => {
+                const isActive = index === currentSegmentIndex;
+                const isSelected = index === selectedFrameIndex;
+
+                return (
+                  <div
+                    key={segment._id}
+                    onClick={() => handleSegmentClick(index)}
+                    className={`relative flex-shrink-0 cursor-pointer rounded-lg border-2 transition-all ${
+                      isActive
+                        ? "border-blue-500 shadow-lg shadow-blue-500/20"
+                        : isSelected
+                          ? "border-default/40"
+                          : "border-default/20 hover:border-default/40"
+                    }`}
+                  >
+                    {/* Segment Thumbnail */}
+                    <div className="relative h-20 w-16 overflow-hidden rounded-md bg-gray-700">
+                      {segment.imageUrl ? (
+                        <img
+                          src={segment.imageUrl}
+                          alt={`Segment ${index + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="text-default/40 flex h-full w-full items-center justify-center">
+                          <span className="text-xs">#{index + 1}</span>
+                        </div>
+                      )}
+
+                      {/* Active indicator */}
+                      {isActive && (
+                        <div className="absolute inset-0 bg-blue-500/20" />
+                      )}
+                    </div>
+
+                    {/* Segment info */}
+                    <div className="text-default/60 absolute -bottom-6 left-0 right-0 text-center text-xs">
+                      {formatTime(segment.duration)}
+                    </div>
+
+                    {/* Play indicator for active segment */}
+                    {isActive && (
+                      <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-blue-500" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

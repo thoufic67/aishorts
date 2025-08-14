@@ -15,6 +15,8 @@ interface VideoFramesPanelProps {
   totalDuration: number;
   onSegmentUpdate?: (index: number, updatedSegment: VideoSegment) => void;
   onSegmentInsert?: (index: number, newSegment: VideoSegment) => void;
+  orientation?: 'vertical' | 'horizontal';
+  showHeader?: boolean;
 }
 
 function formatTime(seconds: number): string {
