@@ -16,7 +16,11 @@ interface FalAIVideoResponse {
 
 export class FalAIService {
   private static API_KEY_STORAGE_KEY = process.env.FAL_AI_API_KEY || "";
-  private static IMAGE_BASE_URL = "https://fal.run/fal-ai/flux/schnell";
+  private static IMAGE_MODELS = {
+    "flux-schnell": "https://fal.run/fal-ai/flux/schnell",
+    "flux-dev": "https://fal.run/fal-ai/flux/dev", 
+    "flux-pro": "https://fal.run/fal-ai/flux-pro",
+  };
   private static VIDEO_MODEL = "fal-ai/minimax-video/image-to-video";
 
   static saveApiKey(apiKey: string): void {
@@ -28,20 +32,18 @@ export class FalAIService {
   }
 
   static getApiKey(): string | null {
-    if (typeof window === "undefined") {
-      // Server-side, use environment variable
-      return process.env.FAL_AI_API_KEY || null;
-    }
-    // Client-side, use localStorage
-    return localStorage.getItem(this.API_KEY_STORAGE_KEY) || process.env.FAL_AI_API_KEY || null;
+    // Server-side, use environment variable
+    return process.env.FAL_AI_API_KEY || null;
   }
 
   static async generateImage(
     prompt: string,
     style?: string,
     imageSize: string = "portrait_16_9",
+    model: string = "flux-schnell",
   ): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
     const apiKey = this.getApiKey();
+    console.log("thoufic api key", apiKey);
     if (!apiKey) {
       return { success: false, error: "Fal.ai API key not found" };
     }
@@ -51,7 +53,9 @@ export class FalAIService {
         ? `${prompt}, ${style}`
         : `${prompt}, cinematic, high quality, detailed`;
 
-      const response = await fetch(this.IMAGE_BASE_URL, {
+      const modelUrl = this.IMAGE_MODELS[model as keyof typeof this.IMAGE_MODELS] || this.IMAGE_MODELS["flux-schnell"];
+
+      const response = await fetch(modelUrl, {
         method: "POST",
         headers: {
           Authorization: `Key ${apiKey}`,

@@ -146,6 +146,41 @@ export default function VideoEditorPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
 
+  const handleSegmentUpdate = (index: number, updatedSegment: VideoSegment) => {
+    if (!videoData) return;
+
+    const updatedSegments = [...videoData.video.segments];
+    updatedSegments[index] = updatedSegment;
+
+    const updatedVideoData = {
+      ...videoData,
+      video: {
+        ...videoData.video,
+        segments: updatedSegments,
+      },
+    };
+
+    setVideoData(updatedVideoData);
+
+    // Update project storage if this video came from there
+    const projectData = ProjectStorage.getProject(videoId);
+    if (projectData) {
+      const updatedProjectData = {
+        ...projectData,
+        segments: updatedSegments.map(segment => ({
+          text: segment.text,
+          imagePrompt: segment.imagePrompt,
+          imageUrl: segment.imageUrl,
+          audioUrl: segment.audioUrl,
+          duration: segment.duration,
+          order: segment.order,
+        })),
+        updatedAt: Date.now(),
+      };
+      ProjectStorage.saveProject(updatedProjectData);
+    }
+  };
+
   useEffect(() => {
     // Try to load from project storage first
     const projectData = ProjectStorage.getProject(videoId);
@@ -211,6 +246,7 @@ export default function VideoEditorPage() {
             onFrameSelect={setSelectedFrameIndex}
             currentTime={currentTime}
             totalDuration={totalDuration}
+            onSegmentUpdate={handleSegmentUpdate}
           />
         </ScrollArea>
 

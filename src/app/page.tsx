@@ -16,10 +16,7 @@ export default function Home() {
           Sign in to Shorts
         </h1>
 
-        <p className="text-surface-500 text-balance text-lg">
-          Lemon Stand is a Next.js billing app template powered by Lemon
-          Squeezy.
-        </p>
+        <p className="text-surface-500 text-balance text-lg">L</p>
 
         <form
           className="pt-2"

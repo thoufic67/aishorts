@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoComposition } from "@/components/video-editor/video-composition";
-import { AudioSequencer } from "@/components/video-editor/audio-sequencer";
 import type { Video, VideoSegment } from "@/types/video";
 
 interface VideoPlayerPanelProps {
@@ -59,6 +58,13 @@ export function VideoPlayerPanel({
     }
   }, [currentTime, fps]);
 
+  // Update Remotion player volume
+  useEffect(() => {
+    if (playerRef.current) {
+      playerRef.current.setVolume(volume);
+    }
+  }, [volume]);
+
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -69,7 +75,6 @@ export function VideoPlayerPanel({
     const ratio = total > 0 ? current / total : 0;
     return `${(ratio * 100).toFixed(1)}%`;
   };
-
 
   // Create a timer to update currentTime when playing
   useEffect(() => {
@@ -98,19 +103,11 @@ export function VideoPlayerPanel({
 
   return (
     <div className="flex flex-1 flex-col bg-gray-50">
-      {/* Audio Sequencer - handles all audio playback */}
-      <AudioSequencer
-        segments={video.segments}
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        volume={volume}
-      />
-      
-      {/* Video Player Area */}
-      <div className="flex flex-1 items-center justify-center p-8">
-        <div className="relative">
+      {/* Video Player Area - Audio is now handled by Remotion */}
+      <div className="flex h-full flex-1 items-center justify-center p-8">
+        <div className="relative h-full">
           {/* Video Container */}
-          <div className="relative aspect-[9/16] w-80 overflow-hidden rounded-lg bg-black shadow-xl">
+          <div className="w-90 relative aspect-[9/16] h-full overflow-hidden rounded-lg bg-black shadow-xl">
             {/* Remotion Player */}
             <Player
               ref={playerRef}
@@ -131,7 +128,7 @@ export function VideoPlayerPanel({
               loop={false}
               allowFullscreen
               doubleClickToFullscreen
-              showVolumeControls={false}
+              showVolumeControls={true}
               spaceKeyToPlayOrPause={false}
             />
 

@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ProjectStorage, VideoSegmentData } from "@/lib/project-storage";
-import { FalAIService } from "@/lib/falai-service";
 import { getDefaultImageStyle } from "@/lib/image-config";
+import { getAudioDuration, estimateAudioDuration } from "@/lib/audio-utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,12 +28,14 @@ import {
   Pause,
 } from "lucide-react";
 import { ScriptSection } from "@/components/create-video/script-section";
+import { VoiceSelection } from "@/components/create-video/voice-selection";
 
 const CreateVideoPage = () => {
   const [selectedVideoType, setSelectedVideoType] = useState("Faceless Video");
   const [script, setScript] = useState("");
   const [selectedMediaType, setSelectedMediaType] = useState("AI Images");
   const [selectedPreset, setSelectedPreset] = useState("Dark and Eerie");
+  const [selectedVoice, setSelectedVoice] = useState("echo");
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentStep, setCurrentStep] = useState("");
   const [progress, setProgress] = useState(0);
@@ -131,28 +133,47 @@ const CreateVideoPage = () => {
       ProjectStorage.updateSegments(projectId, segments);
       setProgress(40);
 
-      // Step 3: Generate images for each segment
-      setCurrentStep("Generating images...");
+      // Step 3: Generate images for all segments using batch API
+      setCurrentStep("Generating all images...");
       const imageStyle = getDefaultImageStyle();
 
-      for (let i = 0; i < segments.length; i++) {
-        const segment = segments[i];
-        setCurrentStep(`Generating image ${i + 1} of ${segments.length}...`);
-
-        // Combine the system prompt from image config with the generated prompt
+      // Prepare batch image generation request
+      const imagePrompts = segments.map(segment => {
         const enhancedPrompt = `${imageStyle.systemPrompt}. ${segment.imagePrompt}`;
+        return {
+          prompt: enhancedPrompt,
+          style: selectedPreset.toLowerCase(),
+          imageSize: "portrait_16_9",
+        };
+      });
 
-        const imageResult = await FalAIService.generateImage(
-          enhancedPrompt,
-          selectedPreset.toLowerCase(),
-          "portrait_16_9", // Use vertical aspect ratio for short videos
-        );
+      setProgress(45);
 
-        if (imageResult.success && imageResult.imageUrl) {
-          ProjectStorage.updateSegmentImage(projectId, i, imageResult.imageUrl);
+      const batchImageResponse = await fetch("/api/generate-images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "batch",
+          prompts: imagePrompts,
+        }),
+      });
+
+      if (!batchImageResponse.ok) {
+        throw new Error("Failed to generate images");
+      }
+
+      const batchImageResult = await batchImageResponse.json();
+      setProgress(65);
+
+      // Update project storage with generated images
+      if (batchImageResult.success && batchImageResult.results) {
+        for (let i = 0; i < batchImageResult.results.length; i++) {
+          const result = batchImageResult.results[i];
+          if (result.success && result.imageUrl) {
+            ProjectStorage.updateSegmentImage(projectId, i, result.imageUrl);
+          }
         }
-
-        setProgress(40 + (i + 1) * (30 / segments.length));
+        setCurrentStep(`Generated ${batchImageResult.totalGenerated} of ${batchImageResult.totalRequested} images`);
       }
 
       // Step 4: Generate audio for each segment
@@ -166,20 +187,36 @@ const CreateVideoPage = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             text: segment.text,
-            voice: "echo",
+            voice: selectedVoice,
             index: i,
           }),
         });
 
         if (audioResponse.ok) {
           const { audioUrl } = await audioResponse.json();
-          // Estimate duration based on text length (roughly 150 WPM)
-          const estimatedDuration = (segment.text.split(" ").length / 150) * 60;
+          
+          // Update progress for audio generation completion
+          setProgress(70 + (i + 0.5) * (30 / segments.length));
+          setCurrentStep(`Getting audio duration for segment ${i + 1}...`);
+          
+          // Get actual audio duration
+          let actualDuration: number;
+          try {
+            // Try to get the actual audio duration
+            actualDuration = await getAudioDuration(audioUrl);
+            console.log(`Segment ${i} actual duration: ${actualDuration.toFixed(2)}s`);
+          } catch (error) {
+            // Fallback to estimated duration if we can't get actual duration
+            console.warn(`Could not get actual duration for segment ${i}, using estimate:`, error);
+            actualDuration = estimateAudioDuration(segment.text);
+            console.log(`Segment ${i} estimated duration: ${actualDuration.toFixed(2)}s`);
+          }
+          
           ProjectStorage.updateSegmentAudio(
             projectId,
             i,
             audioUrl,
-            estimatedDuration,
+            actualDuration,
           );
         }
 
@@ -341,6 +378,12 @@ const CreateVideoPage = () => {
                 ))}
               </div>
             </div>
+
+            {/* Voice Selection */}
+            <VoiceSelection 
+              selectedVoice={selectedVoice}
+              onVoiceSelect={setSelectedVoice}
+            />
 
             {/* Generate button */}
             <div className="space-y-4">
