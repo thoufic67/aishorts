@@ -41,6 +41,8 @@ export function ScriptSection({
     switch (value) {
       case "30s":
         return 30;
+      case "45s":
+        return 45;
       case "1m":
         return 60;
       case "2m":
@@ -201,6 +203,7 @@ export function ScriptSection({
                   {(
                     [
                       "30s",
+                      "45s",
                       //   , "1m", "2m", "3m"
                     ] as const
                   ).map((d) => (

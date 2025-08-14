@@ -1,3 +1,12 @@
+export interface VideoSegmentData {
+  text: string;
+  imagePrompt: string;
+  imageUrl?: string;
+  audioUrl?: string;
+  duration?: number;
+  order: number;
+}
+
 export interface ProjectData {
   id: string;
   title: string;
@@ -8,6 +17,7 @@ export interface ProjectData {
   scriptLines: string[];
   generatedImages: { [key: number]: string };
   generatedVideos: { [key: number]: string };
+  segments?: VideoSegmentData[];
   createdAt: number;
   updatedAt: number;
 }
@@ -57,6 +67,7 @@ export class ProjectStorage {
       scriptLines: [],
       generatedImages: {},
       generatedVideos: {},
+      segments: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -111,6 +122,45 @@ export class ProjectStorage {
     const project = this.getProject(projectId);
     if (project) {
       project.generatedVideos[lineIndex] = videoUrl;
+      this.saveProject(project);
+    }
+  }
+
+  static updateSegments(
+    projectId: string,
+    segments: VideoSegmentData[],
+  ): void {
+    const project = this.getProject(projectId);
+    if (project) {
+      project.segments = segments;
+      this.saveProject(project);
+    }
+  }
+
+  static updateSegmentImage(
+    projectId: string,
+    segmentIndex: number,
+    imageUrl: string,
+  ): void {
+    const project = this.getProject(projectId);
+    if (project && project.segments && project.segments[segmentIndex]) {
+      project.segments[segmentIndex].imageUrl = imageUrl;
+      this.saveProject(project);
+    }
+  }
+
+  static updateSegmentAudio(
+    projectId: string,
+    segmentIndex: number,
+    audioUrl: string,
+    duration?: number,
+  ): void {
+    const project = this.getProject(projectId);
+    if (project && project.segments && project.segments[segmentIndex]) {
+      project.segments[segmentIndex].audioUrl = audioUrl;
+      if (duration) {
+        project.segments[segmentIndex].duration = duration;
+      }
       this.saveProject(project);
     }
   }

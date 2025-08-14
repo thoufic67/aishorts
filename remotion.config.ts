@@ -1,10 +1,13 @@
-import { Config } from "@remotion/cli/config";
+// Remotion configuration
+// Note: This file is used by Remotion CLI but may not be needed for the @remotion/player usage
 
-Config.setVideoImageFormat("jpeg");
-Config.setOverwriteOutput(true);
-Config.setPixelFormat("yuv420p");
-Config.setCodec("h264");
-Config.setCrf(18);
-Config.setImageSequence(false);
+const config = {
+  videoImageFormat: "jpeg" as const,
+  overwriteOutput: true,
+  pixelFormat: "yuv420p" as const,
+  codec: "h264" as const,
+  crf: 18,
+  imageSequence: false,
+};
 
-export default Config;
+export default config;

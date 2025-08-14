@@ -14,6 +14,29 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadProjects();
+
+    // Listen for storage changes to automatically refresh when new projects are created
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "ai_video_projects") {
+        loadProjects();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    // Also refresh when the component becomes visible again
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadProjects();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   const loadProjects = () => {
@@ -28,7 +51,7 @@ const Dashboard = () => {
 
   const handleOpenProject = (projectId: string) => {
     ProjectStorage.setCurrentProject(projectId);
-    router.push(`/project/${projectId}/workflow`);
+    router.push(`/video/${projectId}`);
   };
 
   const handleDeleteProject = (projectId: string, e: React.MouseEvent) => {
@@ -38,6 +61,28 @@ const Dashboard = () => {
   };
 
   const getProjectStatus = (project: ProjectData) => {
+    // Check if project has segments (new video creation workflow)
+    if (project.segments && project.segments.length > 0) {
+      const segmentsWithImages = project.segments.filter(
+        (s) => s.imageUrl,
+      ).length;
+      const segmentsWithAudio = project.segments.filter(
+        (s) => s.audioUrl,
+      ).length;
+
+      if (
+        segmentsWithImages === project.segments.length &&
+        segmentsWithAudio === project.segments.length
+      ) {
+        return "completed";
+      } else if (segmentsWithImages > 0 || segmentsWithAudio > 0) {
+        return "generating";
+      } else {
+        return "script-ready";
+      }
+    }
+
+    // Fallback to old system for backward compatibility
     if (
       project.generatedVideos &&
       Object.keys(project.generatedVideos).length > 0
@@ -144,20 +189,32 @@ const Dashboard = () => {
               >
                 {/* Thumbnail */}
                 <div className="relative aspect-video overflow-hidden bg-secondary/50">
-                  {Object.values(project.generatedImages || {})[0] ? (
-                    <img
-                      src={Object.values(project.generatedImages)[0]}
-                      alt={project.title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <>
-                      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Video className="h-12 w-12 text-foreground/30" />
-                      </div>
-                    </>
-                  )}
+                  {(() => {
+                    // Try to get thumbnail from segments first
+                    const segmentImage = project.segments?.find(
+                      (s) => s.imageUrl,
+                    )?.imageUrl;
+                    // Fallback to old generatedImages system
+                    const legacyImage = Object.values(
+                      project.generatedImages || {},
+                    )[0];
+                    const thumbnailImage = segmentImage || legacyImage;
+
+                    return thumbnailImage ? (
+                      <img
+                        src={thumbnailImage}
+                        alt={project.title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <>
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Video className="h-12 w-12 text-foreground/30" />
+                        </div>
+                      </>
+                    );
+                  })()}
                   <div className="absolute right-3 top-3 flex gap-2">
                     <Badge
                       variant={getStatusVariant(status)}
@@ -200,7 +257,10 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between text-sm text-foreground/70">
                     <div className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {project.scriptLines?.length || 0} lines
+                      {project.segments?.length ||
+                        project.scriptLines?.length ||
+                        0}{" "}
+                      segments
                     </div>
                     <span>{formatDate(project.updatedAt)}</span>
                   </div>

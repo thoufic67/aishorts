@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoComposition } from "@/components/video-editor/video-composition";
+import { AudioSequencer } from "@/components/video-editor/audio-sequencer";
 import type { Video, VideoSegment } from "@/types/video";
 
 interface VideoPlayerPanelProps {
@@ -33,8 +34,6 @@ export function VideoPlayerPanel({
 }: VideoPlayerPanelProps) {
   const playerRef = useRef<any>(null);
   const [volume, setVolume] = useState(1);
-  const mainAudioRef = useRef<HTMLAudioElement | null>(null);
-  const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Calculate frame number for display
   const fps = 30;
@@ -71,98 +70,6 @@ export function VideoPlayerPanel({
     return `${(ratio * 100).toFixed(1)}%`;
   };
 
-  // Initialize audio elements
-  useEffect(() => {
-    // Initialize main audio (prefer combined audio)
-    const combinedAudioLayer = video.layers.find(
-      (layer) => layer.type === "combinedAudio",
-    );
-    if (combinedAudioLayer && !mainAudioRef.current) {
-      mainAudioRef.current = new Audio(combinedAudioLayer.url);
-      mainAudioRef.current.volume = volume * combinedAudioLayer.volume;
-      mainAudioRef.current.preload = "metadata";
-    }
-
-    // Initialize background audio
-    const backgroundAudioLayer = video.layers.find(
-      (layer) => layer.type === "backgroundAudio",
-    );
-    if (backgroundAudioLayer && !backgroundAudioRef.current) {
-      const audioUrl =
-        backgroundAudioLayer.assetId.low_volume ||
-        backgroundAudioLayer.assetId.url;
-      backgroundAudioRef.current = new Audio(audioUrl);
-      backgroundAudioRef.current.volume = volume * backgroundAudioLayer.volume;
-      backgroundAudioRef.current.loop = true;
-      backgroundAudioRef.current.preload = "metadata";
-    }
-
-    return () => {
-      // Cleanup audio elements
-      if (mainAudioRef.current) {
-        mainAudioRef.current.pause();
-        mainAudioRef.current.src = "";
-        mainAudioRef.current = null;
-      }
-      if (backgroundAudioRef.current) {
-        backgroundAudioRef.current.pause();
-        backgroundAudioRef.current.src = "";
-        backgroundAudioRef.current = null;
-      }
-    };
-  }, [video.layers, volume]);
-
-  // Handle audio playback sync
-  useEffect(() => {
-    if (mainAudioRef.current) {
-      if (isPlaying) {
-        // Sync audio time with video time
-        const timeDiff = Math.abs(
-          mainAudioRef.current.currentTime - currentTime,
-        );
-        if (timeDiff > 0.1) {
-          // Only seek if difference is significant
-          mainAudioRef.current.currentTime = currentTime;
-        }
-        mainAudioRef.current.play().catch(console.error);
-      } else {
-        mainAudioRef.current.pause();
-      }
-    }
-
-    if (backgroundAudioRef.current) {
-      if (isPlaying) {
-        backgroundAudioRef.current.play().catch(console.error);
-      } else {
-        backgroundAudioRef.current.pause();
-      }
-    }
-  }, [isPlaying]);
-
-  // Handle time seeking
-  useEffect(() => {
-    if (mainAudioRef.current && !isPlaying) {
-      mainAudioRef.current.currentTime = currentTime;
-    }
-  }, [currentTime, isPlaying]);
-
-  // Update volume for all audio elements
-  useEffect(() => {
-    const combinedAudioLayer = video.layers.find(
-      (layer) => layer.type === "combinedAudio",
-    );
-    const backgroundAudioLayer = video.layers.find(
-      (layer) => layer.type === "backgroundAudio",
-    );
-
-    if (mainAudioRef.current && combinedAudioLayer) {
-      mainAudioRef.current.volume = volume * combinedAudioLayer.volume;
-    }
-
-    if (backgroundAudioRef.current && backgroundAudioLayer) {
-      backgroundAudioRef.current.volume = volume * backgroundAudioLayer.volume;
-    }
-  }, [volume, video.layers]);
 
   // Create a timer to update currentTime when playing
   useEffect(() => {
@@ -191,6 +98,14 @@ export function VideoPlayerPanel({
 
   return (
     <div className="flex flex-1 flex-col bg-gray-50">
+      {/* Audio Sequencer - handles all audio playback */}
+      <AudioSequencer
+        segments={video.segments}
+        isPlaying={isPlaying}
+        currentTime={currentTime}
+        volume={volume}
+      />
+      
       {/* Video Player Area */}
       <div className="flex flex-1 items-center justify-center p-8">
         <div className="relative">

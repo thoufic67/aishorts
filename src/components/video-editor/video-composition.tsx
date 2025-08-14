@@ -4,6 +4,7 @@ import {
   Composition,
   AbsoluteFill,
   Video,
+  Img,
   useCurrentFrame,
   useVideoConfig,
   interpolate,
@@ -56,31 +57,6 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({
 
   const { segment: activeSegment, relativeTime } = getCurrentSegmentAndTime();
 
-  // Get current words from word timings based on relative time within the segment
-  const getCurrentWords = () => {
-    if (!activeSegment.wordTimings.length) return activeSegment.text;
-
-    // Find all words that should be highlighted at current time
-    const activeWords: string[] = [];
-    let lastActiveText = "";
-
-    for (const timing of activeSegment.wordTimings) {
-      if (relativeTime >= timing.start) {
-        lastActiveText = timing.text;
-
-        // Also check individual words within this timing
-        for (const word of timing.words) {
-          if (relativeTime >= word.start && relativeTime <= word.end) {
-            activeWords.push(word.text);
-          }
-        }
-      }
-    }
-
-    // Return the most recent phrase or active words
-    return activeWords.length > 0 ? activeWords.join(" ") : lastActiveText;
-  };
-
   // Get caption style from layers
   const getCaptionStyle = () => {
     const captionLayer = video.layers.find(
@@ -109,6 +85,72 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({
 
   const captionStyle = getCaptionStyle();
 
+  // Get current words and their states for rendering
+  const getCurrentWordsData = () => {
+    if (!activeSegment.wordTimings.length) {
+      return {
+        displayText: activeSegment.text,
+        words: [{ text: activeSegment.text, isActive: true, isCompleted: false }],
+      };
+    }
+
+    const wordsData: Array<{ text: string; isActive: boolean; isCompleted: boolean }> = [];
+    let allWords: Array<{ text: string; start: number; end: number }> = [];
+
+    // Flatten all words from word timings to get proper sequence
+    for (const timing of activeSegment.wordTimings) {
+      for (const word of timing.words) {
+        allWords.push({
+          text: word.text,
+          start: word.start,
+          end: word.end,
+        });
+      }
+    }
+
+    // Sort words by start time to ensure proper order
+    allWords.sort((a, b) => a.start - b.start);
+
+    // Process words to determine states
+    for (const word of allWords) {
+      const wordActive = relativeTime >= word.start && relativeTime <= word.end;
+      const wordCompleted = relativeTime > word.end;
+
+      wordsData.push({
+        text: word.text,
+        isActive: wordActive,
+        isCompleted: wordCompleted,
+      });
+    }
+
+    // Build display text based on wordsPerBatch setting
+    const wordsPerBatch = captionStyle.wordsPerBatch || 3;
+    const activeWordIndex = wordsData.findIndex(w => w.isActive);
+    const completedWords = wordsData.filter(w => w.isCompleted);
+    
+    let displayWords: typeof wordsData = [];
+    
+    if (activeWordIndex >= 0) {
+      // Show words around the currently active word
+      const startIndex = Math.max(0, activeWordIndex - Math.floor(wordsPerBatch / 2));
+      const endIndex = Math.min(wordsData.length, startIndex + wordsPerBatch);
+      displayWords = wordsData.slice(startIndex, endIndex);
+    } else if (completedWords.length > 0) {
+      // Show the last few completed words
+      const startIndex = Math.max(0, completedWords.length - wordsPerBatch);
+      displayWords = completedWords.slice(startIndex);
+    } else {
+      // Show first few words as preview
+      displayWords = wordsData.slice(0, wordsPerBatch);
+    }
+
+    const displayText = displayWords.map(w => w.text).join(" ");
+
+    return { displayText, words: displayWords };
+  };
+
+  const { displayText, words } = getCurrentWordsData();
+
   // Create a subtle animation effect
   const scaleEffect = interpolate(frame % 60, [0, 30, 60], [1, 1.02, 1], {
     extrapolateLeft: "clamp",
@@ -133,16 +175,31 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({
             <AbsoluteFill>
               {/* Background Video/Image */}
               {segment.imageUrl && (
-                <Video
-                  src={segment.imageUrl}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    transform: `scale(${scaleEffect})`,
-                  }}
-                  muted
-                />
+                <>
+                  {/* Check if it's a video or image based on file extension */}
+                  {segment.imageUrl.endsWith('.mp4') || segment.imageUrl.endsWith('.webm') ? (
+                    <Video
+                      src={segment.imageUrl}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        transform: `scale(${scaleEffect})`,
+                      }}
+                      muted
+                    />
+                  ) : (
+                    <Img
+                      src={segment.imageUrl}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        transform: `scale(${scaleEffect})`,
+                      }}
+                    />
+                  )}
+                </>
               )}
 
               {/* Media from media array if no imageUrl */}
@@ -197,11 +254,11 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({
 
       {/* Audio is handled separately outside of Remotion for better optimization */}
 
-      {/* Dynamic Captions with Word Timing */}
+      {/* Dynamic Captions with Word-by-Word Timing */}
       <AbsoluteFill
         style={{
           display: "flex",
-          alignItems: "flex-center",
+          alignItems: "center",
           justifyContent: "center",
           padding: 60,
           paddingBottom: `${captionStyle.fromBottom}%`,
@@ -209,7 +266,6 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({
       >
         <div
           style={{
-            color: captionStyle.activeWordColor,
             fontSize: captionStyle.fontSize,
             fontWeight: captionStyle.fontWeight,
             fontFamily: captionStyle.fontFamily,
@@ -217,17 +273,63 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({
             textShadow: captionStyle.textShadow,
             textTransform: captionStyle.textTransform as any,
             backgroundColor: captionStyle.backgroundColor,
-            lineHeight: 1.2,
+            lineHeight: 1.3,
             maxWidth: "90%",
             padding:
               captionStyle.backgroundColor !== "transparent"
-                ? "12px 24px"
+                ? "16px 32px"
                 : "0",
             borderRadius:
-              captionStyle.backgroundColor !== "transparent" ? "8px" : "0",
+              captionStyle.backgroundColor !== "transparent" ? "12px" : "0",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.3em",
+            justifyContent: "center",
+            alignItems: "center",
           }}
         >
-          {getCurrentWords()}
+          {words.length > 0 ? (
+            words.map((word, index) => {
+              // Create a pulsing animation for active words
+              const pulse = word.isActive ? interpolate(
+                frame % 20,
+                [0, 10, 20],
+                [1, 1.1, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ) : 1;
+
+              return (
+                <span
+                  key={index}
+                  style={{
+                    color: word.isActive 
+                      ? captionStyle.activeWordColor 
+                      : word.isCompleted 
+                        ? captionStyle.activeWordColor 
+                        : captionStyle.inactiveWordColor,
+                    opacity: word.isCompleted ? 0.85 : word.isActive ? 1 : 0.6,
+                    transform: `scale(${word.isActive ? pulse : 1})`,
+                    display: "inline-block",
+                    textShadow: word.isActive 
+                      ? `${captionStyle.textShadow}, 0 0 25px ${captionStyle.activeWordColor}60, 0 0 40px ${captionStyle.activeWordColor}30`
+                      : captionStyle.textShadow,
+                    filter: word.isActive ? "brightness(1.2)" : "brightness(1)",
+                    fontWeight: word.isActive ? "900" : captionStyle.fontWeight,
+                  }}
+                >
+                  {word.text}
+                </span>
+              );
+            })
+          ) : (
+            <span
+              style={{
+                color: captionStyle.activeWordColor,
+              }}
+            >
+              {displayText}
+            </span>
+          )}
         </div>
       </AbsoluteFill>
 

@@ -1,7 +1,11 @@
 import { useState } from "react";
-import { Settings, MoreHorizontal, Plus } from "lucide-react";
+import { Settings, MoreHorizontal, Plus, Edit2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FalAIService } from "@/lib/falai-service";
 import type { VideoSegment } from "@/types/video";
 
 interface VideoFramesPanelProps {
@@ -10,6 +14,7 @@ interface VideoFramesPanelProps {
   onFrameSelect: (index: number) => void;
   currentTime: number;
   totalDuration: number;
+  onSegmentUpdate?: (index: number, updatedSegment: VideoSegment) => void;
 }
 
 function formatTime(seconds: number): string {
@@ -24,7 +29,38 @@ export function VideoFramesPanel({
   onFrameSelect,
   currentTime,
   totalDuration,
+  onSegmentUpdate,
 }: VideoFramesPanelProps) {
+  const [editingPrompt, setEditingPrompt] = useState<{ index: number; prompt: string } | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState<number | null>(null);
+
+  const handleEditPrompt = (index: number, segment: VideoSegment) => {
+    setEditingPrompt({ index, prompt: segment.imagePrompt });
+  };
+
+  const handleRegenerateImage = async (index: number, newPrompt: string) => {
+    if (!onSegmentUpdate) return;
+
+    setIsRegenerating(index);
+    try {
+      const result = await FalAIService.generateImage(newPrompt);
+      if (result.success && result.imageUrl) {
+        const updatedSegment: VideoSegment = {
+          ...segments[index],
+          imagePrompt: newPrompt,
+          imageUrl: result.imageUrl,
+        };
+        onSegmentUpdate(index, updatedSegment);
+      } else {
+        console.error("Failed to regenerate image:", result.error);
+      }
+    } catch (error) {
+      console.error("Error regenerating image:", error);
+    } finally {
+      setIsRegenerating(null);
+      setEditingPrompt(null);
+    }
+  };
   return (
     <div className="w-80 border-r bg-white">
       {/* Header */}

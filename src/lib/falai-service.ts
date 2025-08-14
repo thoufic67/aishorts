@@ -15,7 +15,7 @@ interface FalAIVideoResponse {
 }
 
 export class FalAIService {
-  private static API_KEY_STORAGE_KEY = "fal_ai_api_key";
+  private static API_KEY_STORAGE_KEY = process.env.FAL_AI_API_KEY || "";
   private static IMAGE_BASE_URL = "https://fal.run/fal-ai/flux/schnell";
   private static VIDEO_MODEL = "fal-ai/minimax-video/image-to-video";
 
@@ -28,12 +28,18 @@ export class FalAIService {
   }
 
   static getApiKey(): string | null {
-    return localStorage.getItem(this.API_KEY_STORAGE_KEY);
+    if (typeof window === "undefined") {
+      // Server-side, use environment variable
+      return process.env.FAL_AI_API_KEY || null;
+    }
+    // Client-side, use localStorage
+    return localStorage.getItem(this.API_KEY_STORAGE_KEY) || process.env.FAL_AI_API_KEY || null;
   }
 
   static async generateImage(
     prompt: string,
     style?: string,
+    imageSize: string = "portrait_16_9",
   ): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
     const apiKey = this.getApiKey();
     if (!apiKey) {
@@ -53,7 +59,7 @@ export class FalAIService {
         },
         body: JSON.stringify({
           prompt: fullPrompt,
-          image_size: "square_hd",
+          image_size: imageSize,
           num_inference_steps: 4,
           guidance_scale: 3.5,
           num_images: 1,

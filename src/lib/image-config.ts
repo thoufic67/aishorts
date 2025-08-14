@@ -1,0 +1,38 @@
+export interface ImageStyle {
+  id: string;
+  name: string;
+  description: string;
+  model: string;
+  systemPrompt: string;
+  aspectRatio?: string;
+}
+
+export const imageStyles: ImageStyle[] = [
+  {
+    id: "dark-eerie-photorealistic",
+    name: "Dark & Eerie Photorealistic",
+    description:
+      "Photorealistic POV images with dark, eerie atmosphere with direct flashlight",
+    model: "fal-ai/flux/schnell", // Cheapest Flux model - Schnell is fastest/cheapest
+    systemPrompt:
+      "A photorealistic POV image where the camera is looking into the dark room, camera direct flash light. The scene should be dark and atmospheric with dramatic shadows created by the harsh camera flash. The lighting creates stark contrasts between illuminated and dark areas, giving an eerie, unsettling mood.",
+    aspectRatio: "9:16", // Vertical aspect ratio for short videos
+  },
+  {
+    id: "cinematic-dark",
+    name: "Cinematic Dark",
+    description: "Cinematic style dark imagery with professional lighting",
+    model: "fal-ai/flux/schnell",
+    systemPrompt:
+      "A cinematic, photorealistic image with dramatic dark lighting, professional cinematography style. The scene should have a dark, moody atmosphere with careful attention to lighting and shadows.",
+    aspectRatio: "9:16",
+  },
+];
+
+export const getImageStyle = (id: string): ImageStyle | undefined => {
+  return imageStyles.find((style) => style.id === id);
+};
+
+export const getDefaultImageStyle = (): ImageStyle => {
+  return imageStyles[0]; // Default to dark-eerie-photorealistic
+};

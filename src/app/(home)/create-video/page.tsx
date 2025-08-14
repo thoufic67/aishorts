@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ProjectStorage, VideoSegmentData } from "@/lib/project-storage";
+import { FalAIService } from "@/lib/falai-service";
+import { getDefaultImageStyle } from "@/lib/image-config";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +33,10 @@ const CreateVideoPage = () => {
   const [selectedVideoType, setSelectedVideoType] = useState("Faceless Video");
   const [script, setScript] = useState("");
   const [selectedMediaType, setSelectedMediaType] = useState("AI Images");
-  const [selectedPreset, setSelectedPreset] = useState("4k realistic");
+  const [selectedPreset, setSelectedPreset] = useState("Dark and Eerie");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentStep, setCurrentStep] = useState("");
+  const [progress, setProgress] = useState(0);
   const router = useRouter();
 
   const videoTypes = [
@@ -62,13 +68,139 @@ const CreateVideoPage = () => {
     // { id: "retro", label: "Retro", image: "/preset-retro.jpg" },
   ];
 
-  const handleGenerateVideo = () => {
-    console.log("Generating video...", {
-      videoType: selectedVideoType,
-      script,
-      mediaType: selectedMediaType,
-      preset: selectedPreset,
-    });
+  const handleGenerateVideo = async () => {
+    if (!script.trim()) {
+      alert("Please enter a script first");
+      return;
+    }
+
+    setIsGenerating(true);
+    setProgress(0);
+
+    try {
+      // Step 1: Break script into chunks
+      setCurrentStep("Breaking script into segments...");
+      setProgress(10);
+
+      const chunksResponse = await fetch("/api/break-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ script }),
+      });
+
+      if (!chunksResponse.ok) {
+        throw new Error("Failed to break script into chunks");
+      }
+
+      const { chunks } = await chunksResponse.json();
+      setProgress(20);
+
+      // Step 2: Generate image prompts
+      setCurrentStep("Generating image prompts...");
+      const promptsResponse = await fetch("/api/generate-image-prompts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chunks, style: selectedPreset.toLowerCase() }),
+      });
+
+      if (!promptsResponse.ok) {
+        throw new Error("Failed to generate image prompts");
+      }
+
+      const { prompts } = await promptsResponse.json();
+      setProgress(30);
+
+      // Create new project for this video generation
+      const projectData = ProjectStorage.createNewProject(
+        script.slice(0, 50) + "...", // Use first 50 chars of script as idea
+        `Video Project - ${new Date().toLocaleDateString()}`,
+      );
+
+      // Update the project with the full script
+      ProjectStorage.updateProjectField(projectData.id, "script", script);
+      const projectId = projectData.id;
+
+      const segments: VideoSegmentData[] = chunks.map(
+        (chunk: string, index: number) => ({
+          text: chunk,
+          imagePrompt: prompts[index] || `Visual representation of: ${chunk}`,
+          order: index,
+        }),
+      );
+
+      ProjectStorage.updateSegments(projectId, segments);
+      setProgress(40);
+
+      // Step 3: Generate images for each segment
+      setCurrentStep("Generating images...");
+      const imageStyle = getDefaultImageStyle();
+
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        setCurrentStep(`Generating image ${i + 1} of ${segments.length}...`);
+
+        // Combine the system prompt from image config with the generated prompt
+        const enhancedPrompt = `${imageStyle.systemPrompt}. ${segment.imagePrompt}`;
+
+        const imageResult = await FalAIService.generateImage(
+          enhancedPrompt,
+          selectedPreset.toLowerCase(),
+          "portrait_16_9", // Use vertical aspect ratio for short videos
+        );
+
+        if (imageResult.success && imageResult.imageUrl) {
+          ProjectStorage.updateSegmentImage(projectId, i, imageResult.imageUrl);
+        }
+
+        setProgress(40 + (i + 1) * (30 / segments.length));
+      }
+
+      // Step 4: Generate audio for each segment
+      setCurrentStep("Generating audio...");
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        setCurrentStep(`Generating audio ${i + 1} of ${segments.length}...`);
+
+        const audioResponse = await fetch("/api/text-to-speech", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: segment.text,
+            voice: "echo",
+            index: i,
+          }),
+        });
+
+        if (audioResponse.ok) {
+          const { audioUrl } = await audioResponse.json();
+          // Estimate duration based on text length (roughly 150 WPM)
+          const estimatedDuration = (segment.text.split(" ").length / 150) * 60;
+          ProjectStorage.updateSegmentAudio(
+            projectId,
+            i,
+            audioUrl,
+            estimatedDuration,
+          );
+        }
+
+        setProgress(70 + (i + 1) * (30 / segments.length));
+      }
+
+      setCurrentStep("Video creation complete!");
+      setProgress(100);
+
+      // Redirect to video page with the created video id
+      setTimeout(() => {
+        router.push(`/video/${projectId}`);
+      }, 2000);
+    } catch (error) {
+      console.error("Error generating video:", error);
+      alert(
+        `Error: ${error instanceof Error ? error.message : "Unknown error occurred"}`,
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -211,17 +343,35 @@ const CreateVideoPage = () => {
             </div>
 
             {/* Generate button */}
-            <Button
-              onClick={handleGenerateVideo}
-              className="w-full bg-blue-600 py-3 text-white hover:bg-blue-700"
-              size="lg"
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate Video
-              <span className="ml-auto text-sm opacity-80">
-                Estimated cost: 0 credits
-              </span>
-            </Button>
+            <div className="space-y-4">
+              {isGenerating && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>{currentStep}</span>
+                    <span>{Math.round(progress)}%</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-gray-200">
+                    <div
+                      className="h-2 rounded-full bg-blue-600 transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <Button
+                onClick={handleGenerateVideo}
+                className="w-full bg-blue-600 py-3 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                size="lg"
+                disabled={isGenerating || !script.trim()}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                {isGenerating ? "Generating..." : "Generate Video"}
+                <span className="ml-auto text-sm opacity-80">
+                  Estimated cost: 0 credits
+                </span>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -234,29 +384,23 @@ const CreateVideoPage = () => {
             </div>
 
             <div className="relative aspect-[9/16] overflow-hidden rounded-lg bg-black">
-              {/* Video placeholder with example content */}
-              <div className="absolute inset-0 bg-gradient-to-b from-amber-900/60 via-transparent to-black/60">
-                <div className="flex h-full flex-col justify-between p-4">
-                  <div></div>
-                  <div className="text-center">
-                    <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 backdrop-blur-sm">
-                      <Pause className="h-4 w-4 text-white" />
-                    </div>
-                    <div className="mb-1 text-sm font-medium text-white">
-                      MARK ANTONY
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <video
+                src="/demo/never-go-to-space-alone.mp4"
+                // autoPlay
+                // muted
+                loop
+                controls
+                className="absolute inset-0 h-full w-full object-cover"
+              />
 
               {/* Background image simulation */}
-              <div
+              {/* <div
                 className="absolute inset-0 bg-cover bg-center"
                 style={{
                   backgroundImage:
                     "linear-gradient(45deg, #d4a574 0%, #8b4513 50%, #654321 100%)",
                 }}
-              />
+              /> */}
             </div>
           </div>
         </div>

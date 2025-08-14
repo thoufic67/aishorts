@@ -45,6 +45,21 @@ const ProjectWorkflowPage = () => {
   const getProjectStatus = () => {
     if (!project) return "draft";
 
+    // Check if project has segments (new video creation workflow)
+    if (project.segments && project.segments.length > 0) {
+      const segmentsWithImages = project.segments.filter(s => s.imageUrl).length;
+      const segmentsWithAudio = project.segments.filter(s => s.audioUrl).length;
+      
+      if (segmentsWithImages === project.segments.length && segmentsWithAudio === project.segments.length) {
+        return "completed";
+      } else if (segmentsWithImages > 0 || segmentsWithAudio > 0) {
+        return "generating";
+      } else {
+        return "script-ready";
+      }
+    }
+
+    // Fallback to old system for backward compatibility
     if (
       project.generatedVideos &&
       Object.keys(project.generatedVideos).length > 0
@@ -148,7 +163,7 @@ const ProjectWorkflowPage = () => {
             {project.script ? (
               <div className="space-y-3">
                 <p className="text-sm text-green-600">
-                  ✓ Script generated ({project.scriptLines?.length || 0} lines)
+                  ✓ Script generated ({project.segments?.length || project.scriptLines?.length || 0} segments)
                 </p>
                 <div className="max-h-32 overflow-y-auto rounded bg-background/50 p-3 text-xs">
                   {project.script}
@@ -180,34 +195,38 @@ const ProjectWorkflowPage = () => {
               <h3 className="font-semibold">2. Image Generation</h3>
             </div>
 
-            {Object.keys(project.generatedImages || {}).length > 0 ? (
-              <div className="space-y-3">
-                <p className="text-sm text-green-600">
-                  ✓ {Object.keys(project.generatedImages).length} images
-                  generated
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.values(project.generatedImages)
-                    .slice(0, 4)
-                    .map((imageUrl, index) => (
-                      <div
-                        key={index}
-                        className="aspect-square overflow-hidden rounded bg-background/50"
-                      >
-                        <img
-                          src={imageUrl}
-                          alt={`Generated image ${index + 1}`}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    ))}
+            {(() => {
+              const segmentImages = project.segments?.filter(s => s.imageUrl).map(s => s.imageUrl!) || [];
+              const legacyImages = Object.values(project.generatedImages || {});
+              const allImages = [...segmentImages, ...legacyImages];
+              
+              return allImages.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-green-600">
+                    ✓ {allImages.length} images generated
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {allImages
+                      .slice(0, 4)
+                      .map((imageUrl, index) => (
+                        <div
+                          key={index}
+                          className="aspect-square overflow-hidden rounded bg-background/50"
+                        >
+                          <img
+                            src={imageUrl}
+                            alt={`Generated image ${index + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ))}
+                  </div>
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Image className="mr-2 h-3 w-3" />
+                    View All Images
+                  </Button>
                 </div>
-                <Button variant="outline" size="sm" className="w-full">
-                  <Image className="mr-2 h-3 w-3" />
-                  View All Images
-                </Button>
-              </div>
-            ) : (
+              ) : (
               <div className="space-y-3">
                 <p className="text-sm text-foreground/70">
                   Generate images for each script line
@@ -226,7 +245,8 @@ const ProjectWorkflowPage = () => {
                   </p>
                 )}
               </div>
-            )}
+              );
+            })()}
           </Card>
 
           {/* Step 3: Video */}
@@ -238,40 +258,63 @@ const ProjectWorkflowPage = () => {
               <h3 className="font-semibold">3. Video Creation</h3>
             </div>
 
-            {Object.keys(project.generatedVideos || {}).length > 0 ? (
-              <div className="space-y-3">
-                <p className="text-sm text-green-600">
-                  ✓ {Object.keys(project.generatedVideos).length} videos
-                  generated
-                </p>
-                <div className="space-y-2">
-                  {Object.values(project.generatedVideos)
-                    .slice(0, 2)
-                    .map((videoUrl, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 rounded bg-background/50 p-2"
-                      >
-                        <Video className="h-4 w-4 text-foreground/50" />
-                        <span className="flex-1 truncate text-xs">
-                          Video {index + 1}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 w-6 p-0"
+            {(() => {
+              const segmentAudios = project.segments?.filter(s => s.audioUrl) || [];
+              const legacyVideos = Object.values(project.generatedVideos || {});
+              const hasContent = segmentAudios.length > 0 || legacyVideos.length > 0;
+              
+              return hasContent ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-green-600">
+                    ✓ {segmentAudios.length > 0 ? `${segmentAudios.length} audio segments` : `${legacyVideos.length} videos`} generated
+                  </p>
+                  <div className="space-y-2">
+                    {segmentAudios.length > 0 ? (
+                      segmentAudios.slice(0, 3).map((segment, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 rounded bg-background/50 p-2"
                         >
-                          <Play className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
+                          <Video className="h-4 w-4 text-foreground/50" />
+                          <span className="flex-1 truncate text-xs">
+                            Segment {index + 1}: {segment.text.slice(0, 30)}...
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0"
+                          >
+                            <Play className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      legacyVideos.slice(0, 2).map((videoUrl, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 rounded bg-background/50 p-2"
+                        >
+                          <Video className="h-4 w-4 text-foreground/50" />
+                          <span className="flex-1 truncate text-xs">
+                            Video {index + 1}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0"
+                          >
+                            <Play className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Download className="mr-2 h-3 w-3" />
+                    {segmentAudios.length > 0 ? 'Export Audio Files' : 'Download All'}
+                  </Button>
                 </div>
-                <Button variant="outline" size="sm" className="w-full">
-                  <Download className="mr-2 h-3 w-3" />
-                  Download All
-                </Button>
-              </div>
-            ) : (
+              ) : (
               <div className="space-y-3">
                 <p className="text-sm text-foreground/70">
                   Create videos from generated images
@@ -296,7 +339,8 @@ const ProjectWorkflowPage = () => {
                   </p>
                 )}
               </div>
-            )}
+              );
+            })()}
           </Card>
         </div>
 
@@ -322,9 +366,9 @@ const ProjectWorkflowPage = () => {
             </div>
             <div>
               <label className="text-sm font-medium text-foreground/70">
-                Script Lines
+                Segments
               </label>
-              <p className="text-sm">{project.scriptLines?.length || 0}</p>
+              <p className="text-sm">{project.segments?.length || project.scriptLines?.length || 0}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-foreground/70">

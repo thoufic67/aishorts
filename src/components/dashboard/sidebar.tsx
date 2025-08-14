@@ -1,4 +1,10 @@
-import { CitrusIcon, HomeIcon, SettingsIcon } from "lucide-react";
+import {
+  CitrusIcon,
+  HomeIcon,
+  Play,
+  SettingsIcon,
+  YoutubeIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { auth } from "@/auth";
 import {
@@ -23,9 +29,10 @@ export async function Sidebar() {
     <SidebarProvider>
       <ShadcnSidebar side="left" className="border-r">
         <SidebarHeader>
-          <div className="flex size-10 items-center text-primary">
-            <Link href="/dashboard">
-              <CitrusIcon size={24} strokeWidth={1.5} />
+          <div className="flex size-10 w-full items-center text-primary">
+            <Link href="/dashboard" className="flex w-full gap-2 font-bold">
+              <Play size={24} strokeWidth={1.5} />
+              AI Shorts
             </Link>
           </div>
         </SidebarHeader>
