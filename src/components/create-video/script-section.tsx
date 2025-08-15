@@ -204,7 +204,9 @@ export function ScriptSection({
                     [
                       "30s",
                       "45s",
-                      //   , "1m", "2m", "3m"
+
+                      "2m",
+                      //  "2m", "3m"
                     ] as const
                   ).map((d) => (
                     <Button

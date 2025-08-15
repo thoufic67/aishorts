@@ -36,6 +36,15 @@ export const imageStyles: ImageStyle[] = [
       "A 4K realistic image with professional lighting, professional cinematography style. The scene should have a realistic, professional atmosphere with careful attention to lighting and shadows.",
     aspectRatio: "9:16",
   },
+  {
+    id: "gpt-image-1",
+    name: "GPT Image 1 ",
+    description: "High-quality images generated using OpenAI's gpt image model",
+    model: "gpt-image-1",
+    systemPrompt:
+      "A high-quality, detailed image with professional composition and lighting. The image should be visually striking, well-composed, and suitable for professional video content. Focus on clarity, detail, and visual appeal.",
+    aspectRatio: "9:16",
+  },
 ];
 
 export const getImageStyle = (id: string): ImageStyle | undefined => {

@@ -11,6 +11,12 @@ export interface GenerateScriptParams {
   duration: number; // in seconds
 }
 
+export interface GenerateImageParams {
+  prompt: string;
+  style?: string;
+  imageSize?: string;
+}
+
 export class OpenAIService {
   private static openai: OpenAI | null = null;
 
@@ -127,5 +133,106 @@ ${outputConstraints}`;
     return `Create a ${duration}-second ${styleName} video script based on this idea: "${userPrompt}"
 
 Make it viral-worthy, engaging, and perfectly timed for the specified duration. Focus on creating content that will captivate viewers and encourage shares.`;
+  }
+
+  static async generateImage({
+    prompt,
+    style,
+    imageSize = "1024x1792", // Default to vertical 9:16 ratio
+  }: GenerateImageParams): Promise<{
+    success: boolean;
+    imageUrl?: string;
+    error?: string;
+  }> {
+    try {
+      const client = this.getClient();
+
+      // Build the enhanced prompt with style if provided
+      const enhancedPrompt = style
+        ? `${prompt}, ${style}`
+        : `${prompt}, high quality, detailed, professional`;
+
+      // Convert imageSize format for OpenAI (they use descriptive sizes)
+      let size: "1024x1024" | "1024x1792" | "1792x1024";
+      switch (imageSize) {
+        case "square_hd":
+        case "1024x1024":
+          size = "1024x1024";
+          break;
+        case "portrait_16_9":
+        case "1024x1792":
+          size = "1024x1792";
+          break;
+        case "landscape_16_9":
+        case "1792x1024":
+          size = "1792x1024";
+          break;
+        default:
+          size = "1024x1792"; // Default to vertical
+      }
+
+      const response = await client.images.generate({
+        model: "gpt-image-1",
+        prompt: enhancedPrompt,
+        n: 1,
+        // size: size,
+        quality: "medium", // Use standard quality for cost efficiency
+        // style: "natural", // Use natural style for more realistic images
+      });
+
+      const imageUrl = response.data?.[0]?.url;
+
+      if (!imageUrl) {
+        return {
+          success: false,
+          error: "No image generated from OpenAI",
+        };
+      }
+
+      return {
+        success: true,
+        imageUrl,
+      };
+    } catch (error) {
+      console.error("Error generating image with OpenAI:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to generate image",
+      };
+    }
+  }
+
+  static async editImage({
+    imageUrl,
+    prompt,
+    maskUrl,
+  }: {
+    imageUrl: string;
+    prompt: string;
+    maskUrl?: string;
+  }): Promise<{
+    success: boolean;
+    imageUrl?: string;
+    error?: string;
+  }> {
+    try {
+      const client = this.getClient();
+
+      // Note: This is a placeholder for future image editing functionality
+      // OpenAI's image editing requires uploading files, which is more complex
+      // For now, we'll return an error indicating this feature is not yet implemented
+      return {
+        success: false,
+        error:
+          "Image editing feature is not yet implemented. Use generateImage instead.",
+      };
+    } catch (error) {
+      console.error("Error editing image with OpenAI:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to edit image",
+      };
+    }
   }
 }
