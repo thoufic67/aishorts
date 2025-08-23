@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FalAIService } from "@/lib/falai-service";
 import { OpenAIService } from "@/lib/openai-service";
+import { ImageCache } from "@/lib/image-cache";
 
 interface SingleImageRequest {
   type: "single";
@@ -8,6 +9,8 @@ interface SingleImageRequest {
   style?: string;
   imageSize?: string;
   model?: string;
+  quality?: "low" | "medium" | "high";
+  aspectRatio?: "square" | "portrait" | "landscape";
 }
 
 interface BatchImageRequest {
@@ -17,6 +20,8 @@ interface BatchImageRequest {
     style?: string;
     imageSize?: string;
     model?: string;
+    quality?: "low" | "medium" | "high";
+    aspectRatio?: "square" | "portrait" | "landscape";
   }>;
 }
 
@@ -34,37 +39,59 @@ function isOpenAIModel(model?: string): boolean {
   return model === "dall-e-3" || model === "gpt-image-1";
 }
 
-// Helper function to generate image using the appropriate service
+// Helper function to generate image using the appropriate service with caching
 async function generateImageWithService(
   prompt: string,
   style?: string,
   imageSize?: string,
   model?: string,
+  quality?: "low" | "medium" | "high",
+  aspectRatio?: "square" | "portrait" | "landscape",
 ): Promise<ImageResult> {
+  const cacheModel = model || "flux-schnell";
+  
+  // Check cache first (server-side cache disabled for now due to crypto import)
+  // const cachedImageUrl = ImageCache.getCachedImage(prompt, cacheModel, style);
+  // if (cachedImageUrl) {
+  //   console.log("Retrieved image from cache for prompt:", prompt.substring(0, 50) + "...");
+  //   return {
+  //     success: true,
+  //     imageUrl: cachedImageUrl,
+  //     prompt,
+  //   };
+  // }
+
+  let result: ImageResult;
+  
   if (isOpenAIModel(model)) {
-    // Use OpenAI service for DALL-E 3
-    const result = await OpenAIService.generateImage({
+    // Use OpenAI service for DALL-E 3 and GPT-Image-1
+    result = await OpenAIService.generateImage({
       prompt,
       style,
       imageSize,
+      quality,
+      aspectRatio,
     });
-    return {
-      ...result,
-      prompt,
-    };
   } else {
     // Use FalAI service for Flux models
-    const result = await FalAIService.generateImage(
+    result = await FalAIService.generateImage(
       prompt,
       style,
       imageSize,
       model,
     );
-    return {
-      ...result,
-      prompt,
-    };
   }
+  
+  // Cache the result if successful (server-side cache disabled for now)
+  // if (result.success && result.imageUrl) {
+  //   ImageCache.cacheImage(prompt, result.imageUrl, cacheModel, style);
+  //   console.log("Cached new image for prompt:", prompt.substring(0, 50) + "...");
+  // }
+  
+  return {
+    ...result,
+    prompt,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -78,6 +105,8 @@ export async function POST(request: NextRequest) {
         body.style,
         body.imageSize,
         body.model,
+        body.quality,
+        body.aspectRatio,
       );
 
       return NextResponse.json(result);
@@ -93,6 +122,8 @@ export async function POST(request: NextRequest) {
             promptData.style,
             promptData.imageSize,
             promptData.model,
+            promptData.quality,
+            promptData.aspectRatio,
           );
 
           results.push(result);

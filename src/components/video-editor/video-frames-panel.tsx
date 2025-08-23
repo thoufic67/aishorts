@@ -8,6 +8,7 @@ import {
   Image,
   Mic,
 } from "lucide-react";
+import { useImageGeneration } from "@/hooks/use-image-generation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -75,6 +76,7 @@ export function VideoFramesPanel({
   );
   const [isRegenerating, setIsRegenerating] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<EditMode>("image");
+  const { generateImage } = useImageGeneration();
 
   const imageModels = [
     {
@@ -129,19 +131,10 @@ export function VideoFramesPanel({
 
     setIsRegenerating(index);
     try {
-      const response = await fetch("/api/generate-images", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type: "single",
-          prompt: newPrompt,
-          model: model,
-        }),
+      const result = await generateImage({
+        prompt: newPrompt,
+        model: model,
       });
-
-      const result = await response.json();
 
       if (result.success && result.imageUrl) {
         const updatedSegment: VideoSegment = {
@@ -150,6 +143,10 @@ export function VideoFramesPanel({
           imageUrl: result.imageUrl,
         };
         onSegmentUpdate(index, updatedSegment);
+        
+        if (result.fromCache) {
+          console.log("✓ Image loaded from cache for regeneration");
+        }
       } else {
         console.error("Failed to regenerate image:", result.error);
         alert(`Failed to regenerate image: ${result.error}`);
@@ -285,21 +282,17 @@ export function VideoFramesPanel({
       const imagePrompt = await generateImagePrompt(newFrameState.script);
 
       // Step 2: Generate image
-      const imageResponse = await fetch("/api/generate-images", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type: "single",
-          prompt: imagePrompt,
-          model: newFrameState.imageModel,
-        }),
+      const imageResult = await generateImage({
+        prompt: imagePrompt,
+        model: newFrameState.imageModel,
       });
 
-      const imageResult = await imageResponse.json();
       if (!imageResult.success) {
         throw new Error("Failed to generate image: " + imageResult.error);
+      }
+      
+      if (imageResult.fromCache) {
+        console.log("✓ Image loaded from cache for new frame");
       }
 
       // Step 3: Generate audio
@@ -336,7 +329,7 @@ export function VideoFramesPanel({
         _id: `segment_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
         text: newFrameState.script,
         imagePrompt: imagePrompt,
-        imageUrl: imageResult.imageUrl,
+        imageUrl: imageResult.imageUrl!,
         audioUrl: audioUrl,
         audioVolume: 1,
         playBackRate: 1,

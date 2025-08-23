@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useImageGeneration } from "@/hooks/use-image-generation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ import {
 } from "lucide-react";
 import { ScriptSection } from "@/components/create-video/script-section";
 import { VoiceSelection } from "@/components/create-video/voice-selection";
+import { CacheManagement } from "@/components/ui/cache-management";
 
 const CreateVideoPage = () => {
   const [selectedVideoType, setSelectedVideoType] = useState("Faceless Video");
@@ -49,6 +51,7 @@ const CreateVideoPage = () => {
   const [currentStep, setCurrentStep] = useState("");
   const [progress, setProgress] = useState(0);
   const router = useRouter();
+  const { generateBatchImages, cacheStats } = useImageGeneration();
 
   const videoTypes = [
     { id: "faceless", label: "Faceless Video", icon: Eye, active: true },
@@ -134,7 +137,7 @@ const CreateVideoPage = () => {
       ProjectStorage.updateSegments(projectId, segments);
       setProgress(40);
 
-      // Step 3: Generate images for all segments using batch API
+      // Step 3: Generate images for all segments using cached batch generation
       setCurrentStep("Generating all images...");
       const imageStyle =
         getImageStyle(selectedStyleId) || getDefaultImageStyle();
@@ -160,20 +163,7 @@ const CreateVideoPage = () => {
 
       setProgress(45);
 
-      const batchImageResponse = await fetch("/api/generate-images", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "batch",
-          prompts: imagePrompts,
-        }),
-      });
-
-      if (!batchImageResponse.ok) {
-        throw new Error("Failed to generate images");
-      }
-
-      const batchImageResult = await batchImageResponse.json();
+      const batchImageResult = await generateBatchImages(imagePrompts);
       setProgress(65);
 
       // Update project storage with generated images
@@ -184,8 +174,12 @@ const CreateVideoPage = () => {
             ProjectStorage.updateSegmentImage(projectId, i, result.imageUrl);
           }
         }
+        
+        const cacheMessage = batchImageResult.fromCacheCount > 0 
+          ? ` (${batchImageResult.fromCacheCount} from cache)`
+          : "";
         setCurrentStep(
-          `Generated ${batchImageResult.totalGenerated} of ${batchImageResult.totalRequested} images`,
+          `Generated ${batchImageResult.totalGenerated} of ${batchImageResult.totalRequested} images${cacheMessage}`,
         );
       }
 
@@ -281,19 +275,22 @@ const CreateVideoPage = () => {
             <ChevronRight className="h-4 w-4" />
             <span className="text-foreground">Create</span>
           </div>
-          <div className="flex items-center gap-2 rounded-lg bg-purple-50 px-3 py-2 text-sm">
-            <Crown className="h-4 w-4 text-purple-600" />
-            <span className="text-purple-900">You're on Free Plan</span>
-            <span className="text-purple-700">
-              Upgrade to export videos and more.
-            </span>
-            <Button
-              size="sm"
-              className="ml-2 bg-purple-600 hover:bg-purple-700"
-            >
-              <Sparkles className="mr-1 h-3 w-3" />
-              Upgrade
-            </Button>
+          <div className="flex items-center gap-3">
+            <CacheManagement />
+            <div className="flex items-center gap-2 rounded-lg bg-purple-50 px-3 py-2 text-sm">
+              <Crown className="h-4 w-4 text-purple-600" />
+              <span className="text-purple-900">You're on Free Plan</span>
+              <span className="text-purple-700">
+                Upgrade to export videos and more.
+              </span>
+              <Button
+                size="sm"
+                className="ml-2 bg-purple-600 hover:bg-purple-700"
+              >
+                <Sparkles className="mr-1 h-3 w-3" />
+                Upgrade
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -414,6 +411,19 @@ const CreateVideoPage = () => {
               selectedVoice={selectedVoice}
               onVoiceSelect={setSelectedVoice}
             />
+
+            {/* Cache Statistics */}
+            {cacheStats.totalEntries > 0 && (
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                <div className="flex items-center gap-2 text-green-700 mb-1">
+                  <ImageIcon className="h-4 w-4" />
+                  <span className="text-sm font-medium">Image Cache Active</span>
+                </div>
+                <div className="text-xs text-green-600">
+                  {cacheStats.totalEntries} images cached • Saves API calls for repeated prompts
+                </div>
+              </div>
+            )}
 
             {/* Generate button */}
             <div className="space-y-4">

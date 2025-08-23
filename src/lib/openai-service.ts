@@ -15,6 +15,8 @@ export interface GenerateImageParams {
   prompt: string;
   style?: string;
   imageSize?: string;
+  quality?: "low" | "medium" | "high";
+  aspectRatio?: "square" | "portrait" | "landscape";
 }
 
 export class OpenAIService {
@@ -139,6 +141,8 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
     prompt,
     style,
     imageSize = "1024x1792", // Default to vertical 9:16 ratio
+    quality = "medium", // Default to medium quality for cost efficiency
+    aspectRatio = "portrait", // Default to portrait for short videos
   }: GenerateImageParams): Promise<{
     success: boolean;
     imageUrl?: string;
@@ -152,32 +156,51 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
         ? `${prompt}, ${style}`
         : `${prompt}, high quality, detailed, professional`;
 
-      // Convert imageSize format for OpenAI (they use descriptive sizes)
+      // Determine size based on aspectRatio parameter or imageSize fallback
       let size: "1024x1024" | "1024x1792" | "1792x1024";
-      switch (imageSize) {
-        case "square_hd":
-        case "1024x1024":
-          size = "1024x1024";
-          break;
-        case "portrait_16_9":
-        case "1024x1792":
-          size = "1024x1792";
-          break;
-        case "landscape_16_9":
-        case "1792x1024":
-          size = "1792x1024";
-          break;
-        default:
-          size = "1024x1792"; // Default to vertical
+      
+      // Prioritize aspectRatio parameter over imageSize for GPT-Image-1
+      if (aspectRatio) {
+        switch (aspectRatio) {
+          case "square":
+            size = "1024x1024";
+            break;
+          case "portrait":
+            size = "1024x1792";
+            break;
+          case "landscape":
+            size = "1792x1024";
+            break;
+          default:
+            size = "1024x1792"; // Default to portrait
+        }
+      } else {
+        // Fallback to imageSize for backward compatibility
+        switch (imageSize) {
+          case "square_hd":
+          case "1024x1024":
+            size = "1024x1024";
+            break;
+          case "portrait_16_9":
+          case "1024x1792":
+            size = "1024x1792";
+            break;
+          case "landscape_16_9":
+          case "1792x1024":
+            size = "1792x1024";
+            break;
+          default:
+            size = "1024x1792"; // Default to portrait
+        }
       }
 
       const response = await client.images.generate({
         model: "gpt-image-1",
         prompt: enhancedPrompt,
         n: 1,
-        // size: size,
-        quality: "medium", // Use standard quality for cost efficiency
-        // style: "natural", // Use natural style for more realistic images
+        size: size,
+        quality: quality,
+        style: "natural", // Use natural style for more realistic images
       });
 
       const imageUrl = response.data?.[0]?.url;
