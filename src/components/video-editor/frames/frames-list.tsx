@@ -52,7 +52,10 @@ export function FramesList({
             isSelected={selectedFrameIndex === index}
             orientation={orientation}
             onSelect={() => onFrameSelect(index)}
-            onEdit={() => onEditFrame(index, segment)}
+            onEdit={() => {
+              console.log("FramesList: onEditFrame called for index:", index, "segment.text:", segment.text.substring(0, 50) + "...");
+              onEditFrame(index, segment);
+            }}
             isRegenerating={isRegenerating === index}
           />
 

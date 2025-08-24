@@ -145,7 +145,6 @@ export function VideoPlayerPanel({
         isPlaying={isPlaying}
         currentTime={currentTime}
         backgroundMusicUrl="/demo/temporex.mp3"
-        fps={fps}
         volume={volume}
         isMuted={isMuted}
       />

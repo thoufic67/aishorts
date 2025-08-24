@@ -26,6 +26,7 @@ interface EditSegmentDialogProps {
     script: string,
     voice: string,
   ) => Promise<void>;
+  onSegmentUpdate?: (index: number, updatedSegment: VideoSegment) => void;
   isRegenerating: boolean;
   asContent?: boolean; // When true, returns only DialogContent without Dialog wrapper
 }
@@ -37,6 +38,7 @@ export function EditSegmentDialog({
   segmentIndex,
   onRegenerateImage,
   onRegenerateAudio,
+  onSegmentUpdate,
   isRegenerating,
   asContent = false,
 }: EditSegmentDialogProps) {
@@ -47,7 +49,12 @@ export function EditSegmentDialog({
   const [voice, setVoice] = useState("echo");
 
   // Debug: Log the props - this will show if the component is re-rendering
-  // console.log("EditSegmentDialog RENDER - isOpen:", isOpen, "segment:", segment ? "segment exists" : "no segment", "segmentIndex:", segmentIndex);
+  console.log("EditSegmentDialog RENDER - isOpen:", isOpen, "segment:", segment ? "segment exists" : "no segment", "segmentIndex:", segmentIndex);
+
+  // Debug: Track isOpen changes
+  useEffect(() => {
+    console.log("EditSegmentDialog: isOpen changed to:", isOpen);
+  }, [isOpen]);
 
   // Initialize form values when segment changes
   useEffect(() => {
@@ -59,7 +66,10 @@ export function EditSegmentDialog({
     }
   }, [segment]);
 
-  if (!segment) return null;
+  if (!segment) {
+    console.log("EditSegmentDialog: No segment provided, returning null");
+    return null;
+  }
 
   const handleRegenerateImage = () => {
     void onRegenerateImage(segmentIndex, imagePrompt, imageModel);
@@ -67,6 +77,28 @@ export function EditSegmentDialog({
 
   const handleRegenerateAudio = () => {
     void onRegenerateAudio(segmentIndex, script, voice);
+  };
+
+  const handleImagePromptChange = (newPrompt: string) => {
+    setImagePrompt(newPrompt);
+    if (segment && onSegmentUpdate) {
+      const updatedSegment: VideoSegment = {
+        ...segment,
+        imagePrompt: newPrompt,
+      };
+      onSegmentUpdate(segmentIndex, updatedSegment);
+    }
+  };
+
+  const handleScriptChange = (newScript: string) => {
+    setScript(newScript);
+    if (segment && onSegmentUpdate) {
+      const updatedSegment: VideoSegment = {
+        ...segment,
+        text: newScript,
+      };
+      onSegmentUpdate(segmentIndex, updatedSegment);
+    }
   };
 
   const dialogContent = (
@@ -83,7 +115,7 @@ export function EditSegmentDialog({
             segment={segment}
             imagePrompt={imagePrompt}
             imageModel={imageModel}
-            onPromptChange={setImagePrompt}
+            onPromptChange={handleImagePromptChange}
             onModelChange={setImageModel}
             onRegenerate={handleRegenerateImage}
             isRegenerating={isRegenerating}
@@ -95,7 +127,7 @@ export function EditSegmentDialog({
             segment={segment}
             script={script}
             voice={voice}
-            onScriptChange={setScript}
+            onScriptChange={handleScriptChange}
             onVoiceChange={setVoice}
             onRegenerate={handleRegenerateAudio}
             isRegenerating={isRegenerating}
@@ -120,8 +152,18 @@ export function EditSegmentDialog({
     );
   }
 
+  const handleOpenChange = (open: boolean) => {
+    console.log("EditSegmentDialog: onOpenChange called with open:", open, "isOpen:", isOpen);
+    // Only close if the dialog was actually open and is now being closed
+    // This prevents race conditions when the dialog is first opening
+    if (!open && isOpen) {
+      console.log("EditSegmentDialog: Calling onClose due to dialog close");
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl">
         {dialogContent}
       </DialogContent>

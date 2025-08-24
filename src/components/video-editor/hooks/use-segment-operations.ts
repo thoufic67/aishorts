@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useImageGeneration } from "@/hooks/use-image-generation";
 import { getAudioDuration, estimateAudioDuration } from "@/lib/audio-utils";
 import type { VideoSegment } from "@/types/video";
@@ -40,16 +40,26 @@ export function useSegmentOperations({
   const [isRegenerating, setIsRegenerating] = useState<number | null>(null);
   const { generateImage } = useImageGeneration();
 
+  // Debug: Track editingState changes
+  useEffect(() => {
+    console.log("useSegmentOperations: editingState changed to:", editingState);
+  }, [editingState]);
+
   const handleEdit = (index: number, segment: VideoSegment) => {
-    console.log("handleEdit called with index:", index, "segment:", segment.text);
-    setEditingState({
+    console.log("useSegmentOperations: handleEdit called with index:", index, "segment:", segment.text.substring(0, 50) + "...");
+    console.log("useSegmentOperations: Current editingState before update:", editingState);
+    
+    const newEditingState = {
       index,
-      mode: "image",
+      mode: "image" as EditMode,
       imagePrompt: segment.imagePrompt,
       imageModel: "flux-schnell",
       script: segment.text,
       voice: "echo",
-    });
+    };
+    
+    console.log("useSegmentOperations: Setting new editingState:", newEditingState);
+    setEditingState(newEditingState);
   };
 
   const handleRegenerateImage = async (
@@ -74,10 +84,6 @@ export function useSegmentOperations({
         };
         onSegmentUpdate(index, updatedSegment);
 
-        if (result.fromCache) {
-          // eslint-disable-next-line no-console
-          console.log("✓ Image loaded from cache for regeneration");
-        }
       } else {
         // eslint-disable-next-line no-console
         console.error("Failed to regenerate image:", result.error);
@@ -232,9 +238,6 @@ export function useSegmentOperations({
         throw new Error("Failed to generate image: " + imageResult.error);
       }
 
-      if (imageResult.fromCache) {
-        console.log("✓ Image loaded from cache for new frame");
-      }
 
       // Step 3: Generate audio
       const audioResponse = await fetch("/api/text-to-speech", {
@@ -299,6 +302,7 @@ export function useSegmentOperations({
   };
 
   const closeEditDialog = () => {
+    console.log("useSegmentOperations: closeEditDialog called - clearing editingState");
     setEditingState(null);
   };
 

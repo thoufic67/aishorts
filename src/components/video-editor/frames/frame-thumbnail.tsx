@@ -101,6 +101,7 @@ export function FrameThumbnail({
               className="h-8 w-8 rounded-full bg-black/50 p-0 text-white backdrop-blur-sm hover:bg-white/20"
               onClick={(e) => {
                 e.stopPropagation();
+                console.log("FrameThumbnail: Edit button clicked for index:", index);
                 onEdit();
               }}
               title="Edit segment"

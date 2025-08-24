@@ -15,6 +15,7 @@ export interface GenerateImageParams {
   prompt: string;
   style?: string;
   imageSize?: string;
+  quality?: "low" | "medium" | "high";
   aspectRatio?: "square" | "portrait" | "landscape";
 }
 

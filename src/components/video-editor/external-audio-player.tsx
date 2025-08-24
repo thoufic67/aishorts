@@ -8,7 +8,6 @@ interface ExternalAudioPlayerProps {
   isPlaying: boolean;
   currentTime: number;
   backgroundMusicUrl?: string;
-  fps?: number;
   volume?: number;
   isMuted?: boolean;
 }
@@ -18,7 +17,6 @@ export function ExternalAudioPlayer({
   isPlaying,
   currentTime,
   backgroundMusicUrl = "/demo/temporex.mp3",
-  fps = 30,
   volume = 1,
   isMuted = false,
 }: ExternalAudioPlayerProps) {
@@ -187,13 +185,11 @@ export function ExternalAudioPlayer({
         currentTime >= cumulativeTime &&
         currentTime < cumulativeTime + segmentDuration
       ) {
-        const relativeTime = currentTime - cumulativeTime;
-        const progress = ((relativeTime / segmentDuration) * 100).toFixed(1);
-
         // Only log significant changes to avoid spam
+        // const relativeTime = currentTime - cumulativeTime;
         // if (Math.floor(relativeTime) !== Math.floor(relativeTime - 0.1)) {
         //   console.log(
-        //     `Segment ${i}: ${relativeTime.toFixed(1)}s / ${segmentDuration.toFixed(1)}s (${progress}%)`,
+        //     `Segment ${i}: ${relativeTime.toFixed(1)}s / ${segmentDuration.toFixed(1)}s (${((relativeTime / segmentDuration) * 100).toFixed(1)}%)`,
         //   );
         // }
 

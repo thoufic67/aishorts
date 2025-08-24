@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FalAIService } from "@/lib/falai-service";
 import { OpenAIService } from "@/lib/openai-service";
-import { ImageCache } from "@/lib/image-cache";
 
 interface SingleImageRequest {
   type: "single";
@@ -48,19 +47,6 @@ async function generateImageWithService(
   quality?: "low" | "medium" | "high",
   aspectRatio?: "square" | "portrait" | "landscape",
 ): Promise<ImageResult> {
-  const cacheModel = model || "flux-schnell";
-  
-  // Check cache first (server-side cache disabled for now due to crypto import)
-  // const cachedImageUrl = ImageCache.getCachedImage(prompt, cacheModel, style);
-  // if (cachedImageUrl) {
-  //   console.log("Retrieved image from cache for prompt:", prompt.substring(0, 50) + "...");
-  //   return {
-  //     success: true,
-  //     imageUrl: cachedImageUrl,
-  //     prompt,
-  //   };
-  // }
-
   let result: ImageResult;
   
   if (isOpenAIModel(model)) {
@@ -81,12 +67,6 @@ async function generateImageWithService(
       model,
     );
   }
-  
-  // Cache the result if successful (server-side cache disabled for now)
-  // if (result.success && result.imageUrl) {
-  //   ImageCache.cacheImage(prompt, result.imageUrl, cacheModel, style);
-  //   console.log("Cached new image for prompt:", prompt.substring(0, 50) + "...");
-  // }
   
   return {
     ...result,

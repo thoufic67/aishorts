@@ -18,6 +18,7 @@ export function FrameHeader({ index, onEdit }: FrameHeaderProps) {
             className="h-6 w-6 p-0"
             onClick={(e) => {
               e.stopPropagation();
+              console.log("FrameHeader: Edit button clicked for index:", index);
               onEdit();
             }}
             title="Edit segment"
