@@ -191,11 +191,11 @@ export function ExternalAudioPlayer({
         const progress = ((relativeTime / segmentDuration) * 100).toFixed(1);
 
         // Only log significant changes to avoid spam
-        if (Math.floor(relativeTime) !== Math.floor(relativeTime - 0.1)) {
-          console.log(
-            `Segment ${i}: ${relativeTime.toFixed(1)}s / ${segmentDuration.toFixed(1)}s (${progress}%)`,
-          );
-        }
+        // if (Math.floor(relativeTime) !== Math.floor(relativeTime - 0.1)) {
+        //   console.log(
+        //     `Segment ${i}: ${relativeTime.toFixed(1)}s / ${segmentDuration.toFixed(1)}s (${progress}%)`,
+        //   );
+        // }
 
         return i;
       }

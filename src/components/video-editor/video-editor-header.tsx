@@ -123,7 +123,7 @@ export function VideoEditorHeader({
 
       <div className="flex items-center gap-2">
         {/* Left side buttons */}
-        <Button variant="ghost" size="sm" className="flex items-center gap-2">
+        {/* <Button variant="ghost" size="sm" className="flex items-center gap-2">
           <Layers className="h-4 w-4" />
           <span>Frames</span>
         </Button>
@@ -136,7 +136,7 @@ export function VideoEditorHeader({
         <Button variant="ghost" size="sm" className="flex items-center gap-2">
           <AlignLeft className="h-4 w-4" />
           <span>Audio</span>
-        </Button>
+        </Button> */}
 
         {/* Center - Time display */}
         <div className="mx-8 flex items-center gap-2 text-sm">

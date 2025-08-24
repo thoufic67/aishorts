@@ -96,7 +96,7 @@ export function VideoFramesPanel({
     },
     {
       id: "gpt-image-1",
-      name: "GPT Image 1 (DALL-E 3)",
+      name: "GPT Image 1",
       description: "OpenAI's DALL-E 3, high quality",
     },
   ];
@@ -143,7 +143,7 @@ export function VideoFramesPanel({
           imageUrl: result.imageUrl,
         };
         onSegmentUpdate(index, updatedSegment);
-        
+
         if (result.fromCache) {
           console.log("✓ Image loaded from cache for regeneration");
         }
@@ -290,7 +290,7 @@ export function VideoFramesPanel({
       if (!imageResult.success) {
         throw new Error("Failed to generate image: " + imageResult.error);
       }
-      
+
       if (imageResult.fromCache) {
         console.log("✓ Image loaded from cache for new frame");
       }

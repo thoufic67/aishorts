@@ -152,7 +152,7 @@ export function VideoPlayerPanel({
 
       {/* Video Player Area */}
       <div className="mx-auto flex h-full flex-1 items-center justify-center p-4">
-        <div className="relative mx-auto h-full max-w-sm">
+        <div className="relative mx-auto h-full">
           {/* Video Container */}
           <div
             ref={containerRef}
