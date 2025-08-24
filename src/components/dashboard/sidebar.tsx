@@ -30,9 +30,12 @@ export async function Sidebar() {
       <ShadcnSidebar side="left" className="border-r">
         <SidebarHeader>
           <div className="flex size-10 w-full items-center text-primary">
-            <Link href="/dashboard" className="flex w-full gap-2 font-bold">
-              <Play size={24} strokeWidth={1.5} />
-              AI Shorts
+            <Link
+              href="/dashboard"
+              className="flex w-full items-center gap-2 text-lg font-bold"
+            >
+              <img src="/logo.svg" alt="CursorShorts.com" className="h-10" />
+              CursorShorts
             </Link>
           </div>
         </SidebarHeader>
