@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Loading } from "@/components/ui/loading";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
   Edit3,
@@ -13,67 +15,39 @@ import {
   Download,
   Play,
   RefreshCw,
+  Settings,
+  FileText,
+  Upload,
 } from "lucide-react";
-import { ProjectStorage, ProjectData } from "@/lib/project-storage";
+import { useProject } from "@/hooks/use-projects";
+import { useProjectFiles } from "@/hooks/use-files";
+import { Project, ProjectFile } from "@/types/project";
+import { FileManager } from "@/components/project/file-manager";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 const ProjectWorkflowPage = () => {
-  const [project, setProject] = useState<ProjectData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [showFileManager, setShowFileManager] = useState(false);
+  const [fileTypeFilter, setFileTypeFilter] = useState<'image' | 'video' | 'audio' | undefined>();
   const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
 
-  useEffect(() => {
-    loadProject();
-  }, [projectId]);
-
-  const loadProject = () => {
-    setLoading(true);
-    const projectData = ProjectStorage.getProject(projectId);
-    if (!projectData) {
-      router.push("/dashboard");
-      return;
-    }
-    setProject(projectData);
-    setLoading(false);
-  };
+  const { data: project, isLoading, error } = useProject(projectId);
+  const { data: projectFiles = [] } = useProjectFiles(projectId);
 
   const handleGoBack = () => {
     router.push("/dashboard");
   };
 
-  const getProjectStatus = () => {
-    if (!project) return "draft";
-
-    // Check if project has segments (new video creation workflow)
-    if (project.segments && project.segments.length > 0) {
-      const segmentsWithImages = project.segments.filter(s => s.imageUrl).length;
-      const segmentsWithAudio = project.segments.filter(s => s.audioUrl).length;
-      
-      if (segmentsWithImages === project.segments.length && segmentsWithAudio === project.segments.length) {
-        return "completed";
-      } else if (segmentsWithImages > 0 || segmentsWithAudio > 0) {
-        return "generating";
-      } else {
-        return "script-ready";
-      }
-    }
-
-    // Fallback to old system for backward compatibility
-    if (
-      project.generatedVideos &&
-      Object.keys(project.generatedVideos).length > 0
-    ) {
-      return "completed";
-    } else if (
-      project.generatedImages &&
-      Object.keys(project.generatedImages).length > 0
-    ) {
-      return "generating";
-    } else if (project.script) {
-      return "script-ready";
-    }
-    return "draft";
+  const openFileManager = (filter?: 'image' | 'video' | 'audio') => {
+    setFileTypeFilter(filter);
+    setShowFileManager(true);
   };
 
   const getStatusVariant = (status: string) => {
@@ -84,17 +58,81 @@ const ProjectWorkflowPage = () => {
         return "secondary";
       case "script-ready":
         return "outline";
+      case "draft":
+        return "outline";
+      case "failed":
+        return "destructive";
       default:
         return "outline";
     }
   };
 
-  if (loading) {
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "script-ready":
+        return "Script Ready";
+      case "generating":
+        return "Generating";
+      case "completed":
+        return "Completed";
+      case "failed":
+        return "Failed";
+      case "draft":
+        return "Draft";
+      default:
+        return status;
+    }
+  };
+
+  const getFilesByType = (type: 'image' | 'video' | 'audio'): ProjectFile[] => {
+    return projectFiles.filter(file => file.fileType === type);
+  };
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background pt-20">
         <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <div className="mb-8 flex items-center gap-4">
+            <Skeleton className="h-8 w-8" />
+            <div className="flex-1">
+              <Skeleton className="h-8 w-64 mb-2" />
+              <Skeleton className="h-4 w-96" />
+            </div>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i} className="p-6">
+                <div className="mb-4 flex items-center gap-3">
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <Skeleton className="h-5 w-32" />
+                </div>
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background pt-20">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-foreground">
+              Error loading project
+            </h1>
+            <p className="mt-2 text-foreground/70">
+              {error.message || "Something went wrong while loading the project."}
+            </p>
+            <Button onClick={handleGoBack} className="mt-4">
+              Go Back to Dashboard
+            </Button>
           </div>
         </div>
       </div>
@@ -121,8 +159,6 @@ const ProjectWorkflowPage = () => {
     );
   }
 
-  const status = getProjectStatus();
-
   return (
     <div className="min-h-screen bg-background pt-20">
       <div className="container mx-auto px-4 py-8">
@@ -139,13 +175,26 @@ const ProjectWorkflowPage = () => {
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{project.title}</h1>
-              <Badge variant={getStatusVariant(status)} className="text-xs">
-                {status.replace("-", " ")}
+              <Badge variant={getStatusVariant(project.status) as any} className="text-xs">
+                {getStatusLabel(project.status)}
               </Badge>
             </div>
             {project.idea && (
               <p className="mt-1 text-foreground/70">{project.idea}</p>
             )}
+            {project.description && (
+              <p className="mt-1 text-sm text-foreground/60">{project.description}</p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => openFileManager()}>
+              <FileText className="mr-2 h-4 w-4" />
+              Files ({projectFiles.length})
+            </Button>
+            <Button variant="outline">
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </Button>
           </div>
         </div>
 
@@ -163,15 +212,21 @@ const ProjectWorkflowPage = () => {
             {project.script ? (
               <div className="space-y-3">
                 <p className="text-sm text-green-600">
-                  ✓ Script generated ({project.segments?.length || project.scriptLines?.length || 0} segments)
+                  ✓ Script generated ({project.segments?.length || 0} segments)
                 </p>
                 <div className="max-h-32 overflow-y-auto rounded bg-background/50 p-3 text-xs">
-                  {project.script}
+                  {project.script.substring(0, 300)}
+                  {project.script.length > 300 && '...'}
                 </div>
-                <Button variant="outline" size="sm" className="w-full">
-                  <Edit3 className="mr-2 h-3 w-3" />
-                  Edit Script
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <Edit3 className="mr-2 h-3 w-3" />
+                    Edit Script
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    <RefreshCw className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -196,55 +251,78 @@ const ProjectWorkflowPage = () => {
             </div>
 
             {(() => {
-              const segmentImages = project.segments?.filter(s => s.imageUrl).map(s => s.imageUrl!) || [];
-              const legacyImages = Object.values(project.generatedImages || {});
-              const allImages = [...segmentImages, ...legacyImages];
+              const imageFiles = getFilesByType('image');
               
-              return allImages.length > 0 ? (
+              return imageFiles.length > 0 ? (
                 <div className="space-y-3">
                   <p className="text-sm text-green-600">
-                    ✓ {allImages.length} images generated
+                    ✓ {imageFiles.length} images uploaded/generated
                   </p>
                   <div className="grid grid-cols-2 gap-2">
-                    {allImages
+                    {imageFiles
                       .slice(0, 4)
-                      .map((imageUrl, index) => (
+                      .map((imageFile, index) => (
                         <div
-                          key={index}
+                          key={imageFile.id}
                           className="aspect-square overflow-hidden rounded bg-background/50"
+                          title={imageFile.originalName}
                         >
                           <img
-                            src={imageUrl}
-                            alt={`Generated image ${index + 1}`}
+                            src={imageFile.r2Url || imageFile.tempUrl}
+                            alt={imageFile.originalName}
                             className="h-full w-full object-cover"
+                            loading="lazy"
                           />
                         </div>
                       ))}
                   </div>
-                  <Button variant="outline" size="sm" className="w-full">
-                    <Image className="mr-2 h-3 w-3" />
-                    View All Images
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => openFileManager('image')}
+                    >
+                      <Image className="mr-2 h-3 w-3" />
+                      Manage Images
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => openFileManager('image')}
+                    >
+                      <Upload className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-foreground/70">
-                  Generate images for each script line
-                </p>
-                <Button
-                  className="w-full"
-                  disabled={!project.script}
-                  variant={project.script ? "default" : "outline"}
-                >
-                  <Image className="mr-2 h-4 w-4" />
-                  Generate Images
-                </Button>
-                {!project.script && (
-                  <p className="text-xs text-foreground/50">
-                    Complete script first
+                <div className="space-y-3">
+                  <p className="text-sm text-foreground/70">
+                    Upload or generate images for your project
                   </p>
-                )}
-              </div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1"
+                      disabled={!project.script}
+                      variant={project.script ? "default" : "outline"}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Generate
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => openFileManager('image')}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload
+                    </Button>
+                  </div>
+                  {!project.script && (
+                    <p className="text-xs text-foreground/50">
+                      Complete script first to generate images
+                    </p>
+                  )}
+                </div>
               );
             })()}
           </Card>
@@ -255,90 +333,101 @@ const ProjectWorkflowPage = () => {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary/20">
                 <Video className="h-4 w-4 text-secondary-foreground" />
               </div>
-              <h3 className="font-semibold">3. Video Creation</h3>
+              <h3 className="font-semibold">3. Media & Export</h3>
             </div>
 
             {(() => {
-              const segmentAudios = project.segments?.filter(s => s.audioUrl) || [];
-              const legacyVideos = Object.values(project.generatedVideos || {});
-              const hasContent = segmentAudios.length > 0 || legacyVideos.length > 0;
+              const videoFiles = getFilesByType('video');
+              const audioFiles = getFilesByType('audio');
+              const hasMedia = videoFiles.length > 0 || audioFiles.length > 0;
+              const imageFiles = getFilesByType('image');
               
-              return hasContent ? (
+              return hasMedia ? (
                 <div className="space-y-3">
                   <p className="text-sm text-green-600">
-                    ✓ {segmentAudios.length > 0 ? `${segmentAudios.length} audio segments` : `${legacyVideos.length} videos`} generated
+                    ✓ {videoFiles.length} videos, {audioFiles.length} audio files
                   </p>
                   <div className="space-y-2">
-                    {segmentAudios.length > 0 ? (
-                      segmentAudios.slice(0, 3).map((segment, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-2 rounded bg-background/50 p-2"
+                    {videoFiles.slice(0, 2).map((videoFile) => (
+                      <div
+                        key={videoFile.id}
+                        className="flex items-center gap-2 rounded bg-background/50 p-2"
+                      >
+                        <Video className="h-4 w-4 text-foreground/50" />
+                        <span className="flex-1 truncate text-xs">
+                          {videoFile.originalName}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0"
                         >
-                          <Video className="h-4 w-4 text-foreground/50" />
-                          <span className="flex-1 truncate text-xs">
-                            Segment {index + 1}: {segment.text.slice(0, 30)}...
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0"
-                          >
-                            <Play className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))
-                    ) : (
-                      legacyVideos.slice(0, 2).map((videoUrl, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-2 rounded bg-background/50 p-2"
+                          <Play className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    {audioFiles.slice(0, 2).map((audioFile) => (
+                      <div
+                        key={audioFile.id}
+                        className="flex items-center gap-2 rounded bg-background/50 p-2"
+                      >
+                        <Video className="h-4 w-4 text-foreground/50" />
+                        <span className="flex-1 truncate text-xs">
+                          {audioFile.originalName}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0"
                         >
-                          <Video className="h-4 w-4 text-foreground/50" />
-                          <span className="flex-1 truncate text-xs">
-                            Video {index + 1}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0"
-                          >
-                            <Play className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))
-                    )}
+                          <Play className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                  <Button variant="outline" size="sm" className="w-full">
-                    <Download className="mr-2 h-3 w-3" />
-                    {segmentAudios.length > 0 ? 'Export Audio Files' : 'Download All'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => openFileManager('video')}
+                    >
+                      <Video className="mr-2 h-3 w-3" />
+                      Manage Media
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      <Download className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-foreground/70">
-                  Create videos from generated images
-                </p>
-                <Button
-                  className="w-full"
-                  disabled={
-                    Object.keys(project.generatedImages || {}).length === 0
-                  }
-                  variant={
-                    Object.keys(project.generatedImages || {}).length > 0
-                      ? "default"
-                      : "outline"
-                  }
-                >
-                  <Video className="mr-2 h-4 w-4" />
-                  Generate Videos
-                </Button>
-                {Object.keys(project.generatedImages || {}).length === 0 && (
-                  <p className="text-xs text-foreground/50">
-                    Complete images first
+                <div className="space-y-3">
+                  <p className="text-sm text-foreground/70">
+                    Upload media files or generate videos
                   </p>
-                )}
-              </div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1"
+                      disabled={imageFiles.length === 0}
+                      variant={imageFiles.length > 0 ? "default" : "outline"}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Generate
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => openFileManager('video')}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload
+                    </Button>
+                  </div>
+                  {imageFiles.length === 0 && (
+                    <p className="text-xs text-foreground/50">
+                      Upload images first to generate videos
+                    </p>
+                  )}
+                </div>
               );
             })()}
           </Card>
@@ -347,7 +436,7 @@ const ProjectWorkflowPage = () => {
         {/* Project Details */}
         <Card className="mt-8 bg-card/30 p-6 backdrop-blur-sm">
           <h3 className="mb-4 font-semibold">Project Details</h3>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="text-sm font-medium text-foreground/70">
                 Created
@@ -368,17 +457,79 @@ const ProjectWorkflowPage = () => {
               <label className="text-sm font-medium text-foreground/70">
                 Segments
               </label>
-              <p className="text-sm">{project.segments?.length || project.scriptLines?.length || 0}</p>
+              <p className="text-sm">{project.segments?.length || 0}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-foreground/70">
-                Progress
+                Status
               </label>
-              <p className="text-sm capitalize">{status.replace("-", " ")}</p>
+              <p className="text-sm">
+                <Badge variant={getStatusVariant(project.status) as any} className="text-xs">
+                  {getStatusLabel(project.status)}
+                </Badge>
+              </p>
             </div>
+            <div>
+              <label className="text-sm font-medium text-foreground/70">
+                Total Files
+              </label>
+              <p className="text-sm">{projectFiles.length}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground/70">
+                Images
+              </label>
+              <p className="text-sm">{getFilesByType('image').length}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground/70">
+                Videos
+              </label>
+              <p className="text-sm">{getFilesByType('video').length}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground/70">
+                Audio Files
+              </label>
+              <p className="text-sm">{getFilesByType('audio').length}</p>
+            </div>
+            {project.duration && (
+              <div>
+                <label className="text-sm font-medium text-foreground/70">
+                  Duration
+                </label>
+                <p className="text-sm">{Math.round(project.duration)}s</p>
+              </div>
+            )}
+            {project.format && (
+              <div>
+                <label className="text-sm font-medium text-foreground/70">
+                  Format
+                </label>
+                <p className="text-sm">{project.format.width}x{project.format.height}</p>
+              </div>
+            )}
           </div>
         </Card>
       </div>
+
+      {/* File Manager Dialog */}
+      <Dialog open={showFileManager} onOpenChange={setShowFileManager}>
+        <DialogContent className="max-w-6xl w-full h-[90vh] max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>
+              {fileTypeFilter ? `${fileTypeFilter.charAt(0).toUpperCase() + fileTypeFilter.slice(1)} Files` : 'Project Files'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            <FileManager
+              projectId={projectId}
+              fileTypeFilter={fileTypeFilter}
+              className="h-full"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

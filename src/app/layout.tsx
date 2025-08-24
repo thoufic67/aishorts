@@ -1,6 +1,7 @@
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import type { Metadata } from "next";
+import { QueryProvider } from "@/components/providers/query-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,7 +18,9 @@ export default function RootLayout({
       <body
         className={`${GeistSans.variable} ${GeistMono.variable} min-h-full font-sans`}
       >
-        {children}
+        <QueryProvider>
+          {children}
+        </QueryProvider>
       </body>
     </html>
   );

@@ -1,107 +1,68 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Loading } from "@/components/ui/loading";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Plus, Video, Clock, MoreVertical, Play, Trash2 } from "lucide-react";
-import { ProjectStorage, ProjectData } from "@/lib/project-storage";
+import { useProjects, useDeleteProject } from "@/hooks/use-projects";
+import { Project } from "@/types/project";
+import { toast } from "sonner";
+import { MigrationBanner } from "@/components/migration";
 
 const Dashboard = () => {
-  const [projects, setProjects] = useState<ProjectData[]>([]);
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    loadProjects();
-
-    // Listen for storage changes to automatically refresh when new projects are created
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "ai_video_projects") {
-        loadProjects();
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-
-    // Also refresh when the component becomes visible again
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        loadProjects();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
-
-  const loadProjects = () => {
-    const allProjects = ProjectStorage.getProjectsList();
-    setProjects(allProjects);
-  };
+  
+  const { data: projects = [], isLoading, error, refetch } = useProjects();
+  const deleteProject = useDeleteProject();
 
   const handleCreateProject = () => {
-    console.log("thoufic handlecreateproject");
     router.push("/create-video");
   };
 
   const handleOpenProject = (projectId: string) => {
-    ProjectStorage.setCurrentProject(projectId);
-    router.push(`/video/${projectId}`);
+    // Set current project is handled by the project client
+    router.push(`/project/${projectId}/workflow`);
   };
 
-  const handleDeleteProject = (projectId: string, e: React.MouseEvent) => {
+  const handleDeleteProject = async (projectId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    ProjectStorage.deleteProject(projectId);
-    loadProjects();
+    setDeleteProjectId(projectId);
   };
 
-  const getProjectStatus = (project: ProjectData) => {
-    // Check if project has segments (new video creation workflow)
-    if (project.segments && project.segments.length > 0) {
-      const segmentsWithImages = project.segments.filter(
-        (s) => s.imageUrl,
-      ).length;
-      const segmentsWithAudio = project.segments.filter(
-        (s) => s.audioUrl,
-      ).length;
-
-      if (
-        segmentsWithImages === project.segments.length &&
-        segmentsWithAudio === project.segments.length
-      ) {
-        return "completed";
-      } else if (segmentsWithImages > 0 || segmentsWithAudio > 0) {
-        return "generating";
-      } else {
-        return "script-ready";
-      }
+  const confirmDeleteProject = async () => {
+    if (!deleteProjectId) return;
+    
+    try {
+      await deleteProject.mutateAsync(deleteProjectId);
+      toast.success('Project deleted successfully');
+      setDeleteProjectId(null);
+    } catch (error) {
+      toast.error('Failed to delete project');
+      console.error('Delete error:', error);
     }
-
-    // Fallback to old system for backward compatibility
-    if (
-      project.generatedVideos &&
-      Object.keys(project.generatedVideos).length > 0
-    ) {
-      return "completed";
-    } else if (
-      project.generatedImages &&
-      Object.keys(project.generatedImages).length > 0
-    ) {
-      return "generating";
-    } else if (project.script) {
-      return "script-ready";
-    }
-    return "draft";
   };
 
-  const formatDate = (timestamp: number) => {
-    const now = Date.now();
-    const diff = now - timestamp;
+  const getProjectStatus = (project: Project): string => {
+    return project.status;
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor(diff / (1000 * 60 * 60));
 
@@ -118,8 +79,29 @@ const Dashboard = () => {
         return "secondary";
       case "script-ready":
         return "outline";
+      case "draft":
+        return "outline";
+      case "failed":
+        return "destructive";
       default:
         return "outline";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "script-ready":
+        return "Script Ready";
+      case "generating":
+        return "Generating";
+      case "completed":
+        return "Completed";
+      case "failed":
+        return "Failed";
+      case "draft":
+        return "Draft";
+      default:
+        return status;
     }
   };
 
@@ -139,6 +121,9 @@ const Dashboard = () => {
             New Project
           </Button>
         </div>
+
+        {/* Migration Banner - shows when localStorage projects are detected */}
+        <MigrationBanner />
 
         {/* Stats */}
         {/* <div className="mb-8 grid gap-6 md:grid-cols-4">
@@ -177,34 +162,65 @@ const Dashboard = () => {
           </Card>
         </div> */}
 
-        {/* Projects Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project) => {
-            const status = getProjectStatus(project);
-            return (
-              <Card
-                key={project.id}
-                className="group cursor-pointer overflow-hidden border-border/50 bg-card/30 backdrop-blur-sm transition-all duration-300 hover:bg-card/50"
-                onClick={() => handleOpenProject(project.id)}
-              >
-                {/* Thumbnail */}
-                <div className="relative aspect-video overflow-hidden bg-secondary/50">
-                  {(() => {
-                    // Try to get thumbnail from segments first
-                    const segmentImage = project.segments?.find(
-                      (s) => s.imageUrl,
-                    )?.imageUrl;
-                    // Fallback to old generatedImages system
-                    const legacyImage = Object.values(
-                      project.generatedImages || {},
-                    )[0];
-                    const thumbnailImage = segmentImage || legacyImage;
+        {/* Loading State */}
+        {isLoading && (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="overflow-hidden">
+                <Skeleton className="aspect-video w-full" />
+                <div className="p-4 space-y-2">
+                  <Skeleton className="h-5 w-3/4" />
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
 
-                    return thumbnailImage ? (
+        {/* Error State */}
+        {error && (
+          <Card className="bg-card/30 p-8 text-center backdrop-blur-sm">
+            <div className="text-destructive mb-4">
+              <Video className="mx-auto h-12 w-12" />
+            </div>
+            <h3 className="mb-2 text-lg font-semibold">Failed to load projects</h3>
+            <p className="mb-4 text-foreground/70">
+              {error.message || "Something went wrong while loading your projects."}
+            </p>
+            <Button onClick={() => refetch()}>
+              Try Again
+            </Button>
+          </Card>
+        )}
+
+        {/* Projects Grid */}
+        {!isLoading && !error && projects.length > 0 && (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {projects.map((project) => {
+              const status = getProjectStatus(project);
+              const thumbnailImage = project.segments?.find(s => 
+                s.files?.some(f => f.fileType === 'image')
+              )?.files?.find(f => f.fileType === 'image')?.r2Url;
+
+              return (
+                <Card
+                  key={project.id}
+                  className="group cursor-pointer overflow-hidden border-border/50 bg-card/30 backdrop-blur-sm transition-all duration-300 hover:bg-card/50"
+                  onClick={() => handleOpenProject(project.id)}
+                >
+                  {/* Thumbnail */}
+                  <div className="relative aspect-video overflow-hidden bg-secondary/50">
+                    {thumbnailImage ? (
                       <img
                         src={thumbnailImage}
                         alt={project.title}
                         className="h-full w-full object-cover"
+                        loading="lazy"
                       />
                     ) : (
                       <>
@@ -213,71 +229,80 @@ const Dashboard = () => {
                           <Video className="h-12 w-12 text-foreground/30" />
                         </div>
                       </>
-                    );
-                  })()}
-                  <div className="absolute right-3 top-3 flex gap-2">
-                    <Badge
-                      variant={getStatusVariant(status)}
-                      className="text-xs"
-                    >
-                      {status.replace("-", " ")}
-                    </Badge>
-                  </div>
-                  <div className="absolute left-3 top-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 bg-background/80 p-0 hover:bg-background"
-                      onClick={(e) => handleDeleteProject(project.id, e)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-4">
-                  <div className="mb-2 flex items-start justify-between">
-                    <h3 className="line-clamp-1 font-semibold transition-colors group-hover:text-primary">
-                      {project.title}
-                    </h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenProject(project.id);
-                      }}
-                    >
-                      <Play className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm text-foreground/70">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {project.segments?.length ||
-                        project.scriptLines?.length ||
-                        0}{" "}
-                      segments
+                    )}
+                    <div className="absolute right-3 top-3 flex gap-2">
+                      <Badge
+                        variant={getStatusVariant(status) as any}
+                        className="text-xs"
+                      >
+                        {getStatusLabel(status)}
+                      </Badge>
                     </div>
-                    <span>{formatDate(project.updatedAt)}</span>
+                    <div className="absolute left-3 top-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 bg-background/80 p-0 hover:bg-background"
+                        onClick={(e) => handleDeleteProject(project.id, e)}
+                        disabled={deleteProject.isPending}
+                      >
+                        {deleteProject.isPending && deleteProjectId === project.id ? (
+                          <Loading size="sm" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
 
-                  {project.idea && (
-                    <p className="mt-2 line-clamp-2 text-xs text-foreground/60">
-                      {project.idea}
-                    </p>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                  {/* Content */}
+                  <div className="p-4">
+                    <div className="mb-2 flex items-start justify-between">
+                      <h3 className="line-clamp-1 font-semibold transition-colors group-hover:text-primary">
+                        {project.title}
+                      </h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenProject(project.id);
+                        }}
+                      >
+                        <Play className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm text-foreground/70">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {project.segments?.length || 0} segments
+                      </div>
+                      <span>{formatDate(project.updatedAt)}</span>
+                    </div>
+
+                    {project.idea && (
+                      <p className="mt-2 line-clamp-2 text-xs text-foreground/60">
+                        {project.idea}
+                      </p>
+                    )}
+
+                    {project.duration && (
+                      <div className="mt-2 flex items-center gap-1 text-xs text-foreground/60">
+                        <Clock className="h-3 w-3" />
+                        {Math.round(project.duration)}s duration
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         {/* Empty state for new users */}
-        {projects.length === 0 && (
+        {!isLoading && !error && projects.length === 0 && (
           <Card className="bg-card/30 p-12 text-center backdrop-blur-sm">
             <Video className="mx-auto mb-4 h-16 w-16 text-foreground/30" />
             <h3 className="mb-2 text-xl font-semibold">No projects yet</h3>
@@ -291,6 +316,42 @@ const Dashboard = () => {
           </Card>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteProjectId} onOpenChange={() => setDeleteProjectId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Project</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this project? This action cannot be undone.
+              All associated files and data will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteProjectId(null)}
+              disabled={deleteProject.isPending}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteProject}
+              disabled={deleteProject.isPending}
+            >
+              {deleteProject.isPending ? (
+                <>
+                  <Loading size="sm" className="mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Project'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

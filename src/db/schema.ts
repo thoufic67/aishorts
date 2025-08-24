@@ -6,6 +6,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  real,
   serial,
   text,
   timestamp,
@@ -103,13 +104,68 @@ export const subscriptions = pgTable("subscription", {
   price: text("price").notNull(),
   isUsageBased: boolean("isUsageBased").default(false),
   isPaused: boolean("isPaused").default(false),
-  subscriptionItemId: serial("subscriptionItemId"),
+  subscriptionItemId: integer("subscriptionItemId"),
   userId: text("userId")
     .notNull()
     .references(() => users.id),
   planId: integer("planId")
     .notNull()
     .references(() => plans.id),
+});
+
+// Project Management Tables
+export const projects = pgTable("project", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  idea: text("idea").notNull(),
+  script: text("script"),
+  scriptStyleId: text("scriptStyleId"),
+  inspirationUrls: text("inspirationUrls"), // Store comma-separated URLs or JSON
+  duration: real("duration"), // in seconds - supports decimal values
+  status: text("status").notNull().default("draft"), // 'draft', 'script-ready', 'generating', 'completed', 'failed'
+  format: jsonb("format").$type<{ width: number; height: number }>(),
+  settings: jsonb("settings"),
+  // Only store non-relational data as JSON
+  transcripts: jsonb("transcripts"),
+  scriptLines: jsonb("scriptLines"), 
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+export const projectSegments = pgTable("projectSegment", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text("projectId").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  order: integer("order").notNull(),
+  text: text("text").notNull(),
+  imagePrompt: text("imagePrompt").notNull(),
+  duration: real("duration"), // in seconds - supports decimal values
+  audioVolume: real("audioVolume").default(1.0),
+  playBackRate: real("playBackRate").default(1.0),
+  withBlur: boolean("withBlur").default(false),
+  backgroundMinimized: boolean("backgroundMinimized").default(false),
+  wordTimings: jsonb("wordTimings"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+export const projectFiles = pgTable("projectFile", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text("projectId").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  segmentId: text("segmentId").references(() => projectSegments.id, { onDelete: "cascade" }),
+  fileType: text("fileType").notNull(), // 'image', 'video', 'audio', 'overlay'
+  fileName: text("fileName").notNull(),
+  originalName: text("originalName").notNull(),
+  mimeType: text("mimeType").notNull(),
+  fileSize: integer("fileSize").notNull(),
+  r2Key: text("r2Key").notNull(),
+  r2Url: text("r2Url").notNull(),
+  tempUrl: text("tempUrl"),
+  uploadStatus: text("uploadStatus").notNull().default("uploading"), // 'uploading', 'completed', 'failed'
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  expiresAt: timestamp("expiresAt"),
 });
 
 const pgUrl = process.env.POSTGRES_URL;
@@ -123,6 +179,14 @@ export type NewPlan = typeof plans.$inferInsert;
 export type NewWebhookEvent = typeof webhookEvents.$inferInsert;
 export type NewSubscription = typeof subscriptions.$inferInsert;
 
+// Project Management Types
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
+export type ProjectSegment = typeof projectSegments.$inferSelect;
+export type NewProjectSegment = typeof projectSegments.$inferInsert;
+export type ProjectFile = typeof projectFiles.$inferSelect;
+export type NewProjectFile = typeof projectFiles.$inferInsert;
+
 export const sql = neon<boolean, boolean>(pgUrl);
 export const db = drizzle(sql, {
   schema: {
@@ -133,5 +197,8 @@ export const db = drizzle(sql, {
     webhookEvents,
     plans,
     subscriptions,
+    projects,
+    projectSegments,
+    projectFiles,
   },
 });

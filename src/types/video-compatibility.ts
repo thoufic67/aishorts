@@ -1,0 +1,222 @@
+/**
+ * Compatibility layer between old Video types and new Project types
+ * This allows video editor components to work with the new database-backed projects
+ */
+
+import { Project, ProjectSegment, ProjectFile } from './project';
+import { Video, VideoSegment, MediaFormat, CaptionStyle, Layer } from './video';
+
+// Extended interfaces that bridge old and new systems
+export interface VideoEditorProject extends Project {
+  // Video editor specific properties
+  format: MediaFormat;
+  watermark?: boolean;
+  layers?: Layer[];
+  captionStyle?: CaptionStyle;
+  voiceId?: string;
+  audioType?: string;
+  audioPrompt?: string;
+  mediaType?: string;
+  selectedModel?: string;
+  isRemotion?: boolean;
+}
+
+export interface VideoEditorSegment extends ProjectSegment {
+  // Additional video editor properties
+  imageUrl?: string;  // Computed from files
+  audioUrl?: string;  // Computed from files
+  media?: any[];      // Legacy media items
+  elements?: any[];   // Legacy elements
+  overlay?: any;      // Legacy overlay
+  _id?: string;       // Legacy MongoDB ID for compatibility
+}
+
+// Utility functions to convert between formats
+export class VideoProjectAdapter {
+  
+  /**
+   * Convert a database Project to a Video editor compatible format
+   */
+  static projectToVideo(project: Project, projectFiles: ProjectFile[] = []): Video {
+    const segments = this.convertSegmentsWithFiles(project.segments || [], projectFiles);
+    
+    return {
+      _id: project.id,
+      user: project.userId,
+      title: project.title,
+      script: project.script || '',
+      status: project.status,
+      format: project.format || { width: 1080, height: 1920 },
+      segments,
+      // Default values for video editor
+      selectedMedia: { images: [], videos: [] },
+      voice: 'default',
+      type: 'short',
+      mediaType: 'image',
+      isRemotion: true,
+      selectedModel: 'default',
+      audioType: 'tts',
+      audioPrompt: '',
+      watermark: false,
+      isFeatured: false,
+      layers: [],
+      tracks: [],
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      __v: 0,
+    };
+  }
+
+  /**
+   * Convert project segments with associated files to video segments
+   */
+  static convertSegmentsWithFiles(
+    segments: ProjectSegment[], 
+    projectFiles: ProjectFile[]
+  ): VideoSegment[] {
+    return segments.map((segment, index) => {
+      // Find files for this segment
+      const segmentFiles = projectFiles.filter(file => file.segmentId === segment.id);
+      const imageFile = segmentFiles.find(file => file.fileType === 'image');
+      const audioFile = segmentFiles.find(file => file.fileType === 'audio');
+
+      return {
+        _id: segment.id,
+        text: segment.text,
+        imagePrompt: segment.imagePrompt,
+        imageUrl: imageFile?.r2Url || imageFile?.tempUrl || '',
+        audioUrl: audioFile?.r2Url || audioFile?.tempUrl || '',
+        audioVolume: segment.audioVolume,
+        playBackRate: segment.playBackRate,
+        duration: segment.duration || 0,
+        withBlur: segment.withBlur,
+        backgroundMinimized: segment.backgroundMinimized,
+        order: segment.order,
+        wordTimings: segment.wordTimings ? [segment.wordTimings] : [],
+        media: [],
+        elements: [],
+      };
+    });
+  }
+
+  /**
+   * Convert video segments back to project segments (for updates)
+   */
+  static videoSegmentsToProjectSegments(videoSegments: VideoSegment[]): Partial<ProjectSegment>[] {
+    return videoSegments.map(segment => ({
+      id: segment._id,
+      text: segment.text,
+      imagePrompt: segment.imagePrompt,
+      order: segment.order,
+      duration: segment.duration,
+      audioVolume: segment.audioVolume,
+      playBackRate: segment.playBackRate,
+      withBlur: segment.withBlur,
+      backgroundMinimized: segment.backgroundMinimized,
+      wordTimings: segment.wordTimings?.[0] || undefined,
+    }));
+  }
+
+  /**
+   * Extract file URLs from video segments that need to be uploaded
+   */
+  static extractFileUploads(videoSegments: VideoSegment[], projectId: string): Array<{
+    segmentId: string;
+    type: 'image' | 'audio';
+    url: string;
+    order: number;
+  }> {
+    const uploads: Array<{
+      segmentId: string;
+      type: 'image' | 'audio';
+      url: string;
+      order: number;
+    }> = [];
+
+    videoSegments.forEach(segment => {
+      if (segment.imageUrl && segment.imageUrl.startsWith('data:')) {
+        uploads.push({
+          segmentId: segment._id || '',
+          type: 'image',
+          url: segment.imageUrl,
+          order: segment.order,
+        });
+      }
+
+      if (segment.audioUrl && segment.audioUrl.startsWith('data:') || segment.audioUrl.startsWith('blob:')) {
+        uploads.push({
+          segmentId: segment._id || '',
+          type: 'audio', 
+          url: segment.audioUrl,
+          order: segment.order,
+        });
+      }
+    });
+
+    return uploads;
+  }
+
+  /**
+   * Calculate total video duration from segments
+   */
+  static calculateTotalDuration(segments: VideoSegment[]): number {
+    return segments.reduce((total, segment) => total + (segment.duration || 0), 0);
+  }
+
+  /**
+   * Get segment at specific time
+   */
+  static getSegmentAtTime(segments: VideoSegment[], currentTime: number): {
+    segment: VideoSegment;
+    index: number;
+    segmentStartTime: number;
+  } | null {
+    let accumulatedTime = 0;
+    
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const segmentDuration = segment.duration || 0;
+      
+      if (currentTime >= accumulatedTime && currentTime < accumulatedTime + segmentDuration) {
+        return {
+          segment,
+          index: i,
+          segmentStartTime: accumulatedTime,
+        };
+      }
+      
+      accumulatedTime += segmentDuration;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Convert time to frame number
+   */
+  static timeToFrame(time: number, fps: number = 30): number {
+    return Math.floor(time * fps);
+  }
+
+  /**
+   * Convert frame to time
+   */
+  static frameToTime(frame: number, fps: number = 30): number {
+    return frame / fps;
+  }
+}
+
+// Hook to use video editor with projects
+export interface UseVideoEditorProps {
+  projectId: string;
+}
+
+export interface UseVideoEditorReturn {
+  video: Video | null;
+  isLoading: boolean;
+  error: Error | null;
+  updateSegment: (segmentIndex: number, updates: Partial<VideoSegment>) => Promise<void>;
+  uploadSegmentFile: (segmentId: string, file: File, type: 'image' | 'audio') => Promise<void>;
+  uploadBase64File: (segmentId: string, base64Data: string, fileName: string, type: 'image' | 'audio') => Promise<void>;
+  refreshVideo: () => void;
+}

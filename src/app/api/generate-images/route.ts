@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FalAIService } from "@/lib/falai-service";
 import { OpenAIService } from "@/lib/openai-service";
+import { auth } from "@/auth";
 
 interface SingleImageRequest {
   type: "single";
@@ -10,10 +11,15 @@ interface SingleImageRequest {
   model?: string;
   quality?: "low" | "medium" | "high";
   aspectRatio?: "square" | "portrait" | "landscape";
+  storeInR2?: boolean;
+  projectId?: string;
+  segmentId?: string;
 }
 
 interface BatchImageRequest {
   type: "batch";
+  storeInR2?: boolean;
+  projectId?: string;
   prompts: Array<{
     prompt: string;
     style?: string;
@@ -21,6 +27,7 @@ interface BatchImageRequest {
     model?: string;
     quality?: "low" | "medium" | "high";
     aspectRatio?: "square" | "portrait" | "landscape";
+    segmentId?: string;
   }>;
 }
 
@@ -29,6 +36,10 @@ type ImageGenerationRequest = SingleImageRequest | BatchImageRequest;
 interface ImageResult {
   success: boolean;
   imageUrl?: string;
+  r2Key?: string;
+  r2Url?: string;
+  tempUrl?: string;
+  fileRecord?: any;
   error?: string;
   prompt?: string;
 }
@@ -46,6 +57,10 @@ async function generateImageWithService(
   model?: string,
   quality?: "low" | "medium" | "high",
   aspectRatio?: "square" | "portrait" | "landscape",
+  storeInR2?: boolean,
+  userId?: string,
+  projectId?: string,
+  segmentId?: string,
 ): Promise<ImageResult> {
   let result: ImageResult;
   
@@ -57,9 +72,14 @@ async function generateImageWithService(
       imageSize,
       quality,
       aspectRatio,
+      storeInR2,
+      userId,
+      projectId,
+      segmentId,
     });
   } else {
     // Use FalAI service for Flux models
+    // Note: FalAI service doesn't yet support R2 storage
     result = await FalAIService.generateImage(
       prompt,
       style,
@@ -78,6 +98,20 @@ export async function POST(request: NextRequest) {
   try {
     const body: ImageGenerationRequest = await request.json();
 
+    // Get user session if R2 storage is requested
+    let userId: string | undefined;
+    if ((body.type === "single" && body.storeInR2) || 
+        (body.type === "batch" && body.storeInR2)) {
+      const session = await auth();
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { success: false, error: 'Authentication required for R2 storage' },
+          { status: 401 }
+        );
+      }
+      userId = session.user.id;
+    }
+
     if (body.type === "single") {
       // Single image generation for regeneration
       const result = await generateImageWithService(
@@ -87,6 +121,10 @@ export async function POST(request: NextRequest) {
         body.model,
         body.quality,
         body.aspectRatio,
+        body.storeInR2,
+        userId,
+        body.projectId,
+        body.segmentId,
       );
 
       return NextResponse.json(result);
@@ -104,6 +142,10 @@ export async function POST(request: NextRequest) {
             promptData.model,
             promptData.quality,
             promptData.aspectRatio,
+            body.storeInR2,
+            userId,
+            body.projectId,
+            promptData.segmentId,
           );
 
           results.push(result);

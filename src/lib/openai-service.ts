@@ -1,5 +1,8 @@
 import OpenAI from "openai";
 import { getScriptStyle } from "@/lib/script-config";
+import { R2Storage } from "@/lib/r2-storage";
+import { ProjectService } from "@/lib/project-service";
+import { FileUtils } from "@/lib/file-utils";
 
 interface OpenAIScriptResponse {
   script: string;
@@ -17,6 +20,10 @@ export interface GenerateImageParams {
   imageSize?: string;
   quality?: "low" | "medium" | "high";
   aspectRatio?: "square" | "portrait" | "landscape";
+  storeInR2?: boolean;
+  userId?: string;
+  projectId?: string;
+  segmentId?: string;
 }
 
 export class OpenAIService {
@@ -142,9 +149,17 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
     style,
     imageSize = "1024x1792", // Default to vertical 9:16 ratio
     aspectRatio = "portrait", // Default to portrait for short videos
+    storeInR2 = false,
+    userId,
+    projectId,
+    segmentId,
   }: GenerateImageParams): Promise<{
     success: boolean;
     imageUrl?: string;
+    r2Key?: string;
+    r2Url?: string;
+    tempUrl?: string;
+    fileRecord?: any;
     error?: string;
   }> {
     try {
@@ -221,6 +236,88 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
           success: false,
           error: "No image URL or base64 data received from OpenAI",
         };
+      }
+
+      // Store in R2 if requested
+      if (storeInR2 && userId && projectId) {
+        try {
+          let r2Key: string;
+          let r2Url: string;
+          let fileRecord: any;
+
+          // Handle base64 data
+          if (imageData.b64_json) {
+            const uploadResult = await R2Storage.uploadImageFromBase64(
+              `data:image/png;base64,${imageData.b64_json}`,
+              userId,
+              projectId,
+              segmentId
+            );
+            r2Key = uploadResult.key;
+            r2Url = uploadResult.url;
+          } else if (imageData.url) {
+            // Handle URL - fetch and upload
+            const uploadResult = await R2Storage.uploadFromUrl(
+              imageData.url,
+              userId,
+              projectId,
+              'image',
+              segmentId
+            );
+            r2Key = uploadResult.key;
+            r2Url = uploadResult.url;
+          } else {
+            return {
+              success: false,
+              error: "No image data available for R2 storage",
+            };
+          }
+
+          // Create file record in database
+          const fileName = `generated-image-${Date.now()}.png`;
+          const mimeType = 'image/png';
+          
+          // Estimate file size (rough approximation for PNG)
+          const estimatedSize = 1024 * 1024; // 1MB default
+          
+          fileRecord = await ProjectService.createFile({
+            projectId,
+            segmentId: segmentId || null,
+            fileType: 'image',
+            fileName: FileUtils.sanitizeFilename(fileName),
+            originalName: fileName,
+            mimeType,
+            fileSize: estimatedSize,
+            r2Key,
+            r2Url,
+            tempUrl: imageUrl, // Keep original URL as temp
+            uploadStatus: 'completed',
+            metadata: {
+              prompt: prompt,
+              style: style,
+              generatedAt: new Date().toISOString(),
+              model: 'gpt-image-1',
+              size: size,
+            },
+          });
+
+          return {
+            success: true,
+            imageUrl: r2Url, // Return R2 URL
+            r2Key,
+            r2Url,
+            tempUrl: imageUrl, // Original temp URL
+            fileRecord,
+          };
+        } catch (r2Error) {
+          console.error("Error storing image in R2:", r2Error);
+          // Return original image URL if R2 storage fails
+          return {
+            success: true,
+            imageUrl,
+            error: "Image generated but R2 storage failed",
+          };
+        }
       }
 
       return {
