@@ -49,12 +49,18 @@ export function EditSegmentDialog({
   const [voice, setVoice] = useState("echo");
 
   // Debug: Log the props - this will show if the component is re-rendering
-  console.log("EditSegmentDialog RENDER - isOpen:", isOpen, "segment:", segment ? "segment exists" : "no segment", "segmentIndex:", segmentIndex);
 
   // Debug: Track isOpen changes
   useEffect(() => {
-    console.log("EditSegmentDialog: isOpen changed to:", isOpen);
-  }, [isOpen]);
+    console.log(
+      "EditSegmentDialog RENDER - isOpen:",
+      isOpen,
+      "segment:",
+      segment ? "segment exists" : "no segment",
+      "segmentIndex:",
+      segmentIndex,
+    );
+  }, [isOpen, segment, segmentIndex]);
 
   // Initialize form values when segment changes
   useEffect(() => {
@@ -145,15 +151,16 @@ export function EditSegmentDialog({
   );
 
   if (asContent) {
-    return (
-      <DialogContent className="max-w-2xl">
-        {dialogContent}
-      </DialogContent>
-    );
+    return <DialogContent className="max-w-2xl">{dialogContent}</DialogContent>;
   }
 
   const handleOpenChange = (open: boolean) => {
-    console.log("EditSegmentDialog: onOpenChange called with open:", open, "isOpen:", isOpen);
+    console.log(
+      "EditSegmentDialog: onOpenChange called with open:",
+      open,
+      "isOpen:",
+      isOpen,
+    );
     // Only close if the dialog was actually open and is now being closed
     // This prevents race conditions when the dialog is first opening
     if (!open && isOpen) {
@@ -164,9 +171,7 @@ export function EditSegmentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl">
-        {dialogContent}
-      </DialogContent>
+      <DialogContent className="max-w-2xl">{dialogContent}</DialogContent>
     </Dialog>
   );
 }
