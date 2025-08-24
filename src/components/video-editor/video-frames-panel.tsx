@@ -504,7 +504,7 @@ export function VideoFramesPanel({
                                                       alt={
                                                         currentSegment.imagePrompt
                                                       }
-                                                      className="absolute inset-0 h-full w-full object-cover"
+                                                      className="absolute inset-0 h-full w-full object-contain"
                                                     />
                                                   ) : (
                                                     <div className="absolute inset-0 flex items-center justify-center text-gray-400">
@@ -955,7 +955,7 @@ export function VideoFramesPanel({
                                                 <label className="text-sm font-medium">
                                                   Current Image
                                                 </label>
-                                                <div className="relative mx-auto mt-2 aspect-[9/16] w-full max-w-48 overflow-hidden rounded-lg border bg-gray-100">
+                                                <div className="relative mx-auto mt-2 max-h-full w-full max-w-48 overflow-hidden rounded-lg border bg-gray-100">
                                                   {currentSegment.imageUrl ? (
                                                     <img
                                                       src={
@@ -964,7 +964,7 @@ export function VideoFramesPanel({
                                                       alt={
                                                         currentSegment.imagePrompt
                                                       }
-                                                      className="absolute inset-0 h-full w-full object-cover"
+                                                      className="inset-0 h-full w-full object-contain"
                                                     />
                                                   ) : (
                                                     <div className="absolute inset-0 flex items-center justify-center text-gray-400">

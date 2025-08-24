@@ -15,7 +15,6 @@ export interface GenerateImageParams {
   prompt: string;
   style?: string;
   imageSize?: string;
-  quality?: "low" | "medium" | "high";
   aspectRatio?: "square" | "portrait" | "landscape";
 }
 
@@ -141,7 +140,6 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
     prompt,
     style,
     imageSize = "1024x1792", // Default to vertical 9:16 ratio
-    quality = "medium", // Default to medium quality for cost efficiency
     aspectRatio = "portrait", // Default to portrait for short videos
   }: GenerateImageParams): Promise<{
     success: boolean;
@@ -158,7 +156,7 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
 
       // Determine size based on aspectRatio parameter or imageSize fallback
       let size: "1024x1024" | "1024x1792" | "1792x1024";
-      
+
       // Prioritize aspectRatio parameter over imageSize for GPT-Image-1
       if (aspectRatio) {
         switch (aspectRatio) {
@@ -197,18 +195,30 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
       const response = await client.images.generate({
         model: "gpt-image-1",
         prompt: enhancedPrompt,
-        n: 1,
-        size: size,
-        quality: quality,
-        style: "natural", // Use natural style for more realistic images
+        size: "1024x1024", // Use the calculated size variable
+        quality: "low",
       });
 
-      const imageUrl = response.data?.[0]?.url;
+      const imageData = response.data?.[0];
 
-      if (!imageUrl) {
+      if (!imageData) {
         return {
           success: false,
           error: "No image generated from OpenAI",
+        };
+      }
+
+      // Handle both URL and base64 response formats
+      let imageUrl: string;
+      if (imageData.url) {
+        imageUrl = imageData.url;
+      } else if (imageData.b64_json) {
+        // Convert base64 to data URL
+        imageUrl = `data:image/png;base64,${imageData.b64_json}`;
+      } else {
+        return {
+          success: false,
+          error: "No image URL or base64 data received from OpenAI",
         };
       }
 

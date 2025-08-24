@@ -128,7 +128,7 @@ const MediaElement: React.FC<MediaElementProps> = ({ src, scaleEffect }) => {
   const mediaStyle = {
     width: "100%",
     height: "100%",
-    objectFit: "cover" as const,
+    objectFit: "contain" as const,
     transform: `scale(${scaleEffect})`,
   };
 
