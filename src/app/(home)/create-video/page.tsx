@@ -5,7 +5,8 @@ import { useImageGeneration } from "@/hooks/use-image-generation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ProjectStorage, VideoSegmentData } from "@/lib/project-storage";
+import { VideoSegmentData } from "@/lib/project-storage";
+import { ProjectAPI } from "@/lib/project-api";
 import {
   imageStyles,
   getDefaultImageStyle,
@@ -116,14 +117,18 @@ const CreateVideoPage = () => {
       setProgress(30);
 
       // Create new project for this video generation
-      const projectData = ProjectStorage.createNewProject(
-        script.slice(0, 50) + "...", // Use first 50 chars of script as idea
-        `Video Project - ${new Date().toLocaleDateString()}`,
-      );
-
-      // Update the project with the full script
-      ProjectStorage.updateProjectField(projectData.id, "script", script);
-      const projectId = projectData.id;
+      let projectId: string;
+      try {
+        const { data: projectData } = await ProjectAPI.createProject({
+          title: `Video Project - ${new Date().toLocaleDateString()}`,
+          idea: script.slice(0, 200) + (script.length > 200 ? '...' : ''), // Use first 200 chars as idea
+          script: script,
+        });
+        projectId = projectData.id;
+      } catch (error) {
+        console.error('Failed to create project:', error);
+        throw new Error('Failed to create project. Please try again.');
+      }
 
       const segments: VideoSegmentData[] = chunks.map(
         (chunk: string, index: number) => ({
@@ -133,7 +138,15 @@ const CreateVideoPage = () => {
         }),
       );
 
-      ProjectStorage.updateSegments(projectId, segments);
+      // Create segments in the database via API
+      let createdSegments;
+      try {
+        const result = await ProjectAPI.createSegmentsBatch(projectId, segments);
+        createdSegments = result.data;
+      } catch (error) {
+        console.error('Failed to create segments:', error);
+        throw new Error('Failed to create video segments. Please try again.');
+      }
       setProgress(40);
 
       // Step 3: Generate images for all segments using cached batch generation
@@ -165,12 +178,25 @@ const CreateVideoPage = () => {
       const batchImageResult = await generateBatchImages(imagePrompts);
       setProgress(65);
 
-      // Update project storage with generated images
+      // Update segments with generated images via API
       if (batchImageResult.success && batchImageResult.results) {
         for (let i = 0; i < batchImageResult.results.length; i++) {
           const result = batchImageResult.results[i];
-          if (result.success && result.imageUrl) {
-            ProjectStorage.updateSegmentImage(projectId, i, result.imageUrl);
+          if (result.success && result.imageUrl && createdSegments[i]) {
+            // Upload image to the project files system
+            try {
+              await ProjectAPI.uploadFile({
+                projectId: projectId,
+                segmentId: createdSegments[i].id,
+                fileType: 'image',
+                fileName: `segment_${i}_image.webp`,
+                mimeType: 'image/webp',
+                fileSize: 1024, // Placeholder size
+                sourceUrl: result.imageUrl,
+              });
+            } catch (error) {
+              console.warn(`Failed to upload image for segment ${i}:`, error);
+            }
           }
         }
         
@@ -210,37 +236,60 @@ const CreateVideoPage = () => {
           );
           console.log(`Segment ${i} duration: ${actualDuration.toFixed(2)}s`);
 
-          ProjectStorage.updateSegmentAudio(
-            projectId,
-            i,
-            audioUrl,
-            actualDuration,
-          );
+          // Upload audio file and update segment duration
+          try {
+            await ProjectAPI.uploadFile({
+              projectId: projectId,
+              segmentId: createdSegments[i].id,
+              fileType: 'audio',
+              fileName: `segment_${i}_audio.mp3`,
+              mimeType: 'audio/mpeg',
+              fileSize: 1024, // Placeholder size
+              sourceUrl: audioUrl,
+            });
+
+            // Update segment duration
+            await ProjectAPI.updateSegment(projectId, createdSegments[i].id, {
+              duration: actualDuration,
+            });
+          } catch (error) {
+            console.warn(`Failed to upload audio for segment ${i}:`, error);
+          }
         }
 
         setProgress(70 + (i + 1) * (30 / segments.length));
       }
 
-      // Validate all segment durations before completing
-      const finalProject = ProjectStorage.getProject(projectId);
-      if (finalProject?.segments) {
-        const isValid = validateSegmentDurations(finalProject.segments);
-        if (!isValid) {
-          console.warn(
-            "Some segments had invalid durations, they have been fixed with estimates",
-          );
-          // Save the fixed durations
-          ProjectStorage.saveProject(finalProject);
-        }
+      // Fetch final project data to validate durations
+      try {
+        const { data: finalProject } = await ProjectAPI.getProject(projectId, true);
+        
+        if (finalProject?.segments) {
+          const isValid = validateSegmentDurations(finalProject.segments);
+          if (!isValid) {
+            console.warn(
+              "Some segments had invalid durations, they have been fixed with estimates",
+            );
+            // Note: Duration validation and fixing is now handled by the API
+          }
 
-        // Log total video duration for debugging
-        const totalDuration = finalProject.segments.reduce(
-          (acc, seg) => acc + (seg.duration || 0),
-          0,
-        );
-        console.log(
-          `Total video duration: ${totalDuration.toFixed(2)}s for ${finalProject.segments.length} segments`,
-        );
+          // Log total video duration for debugging
+          const totalDuration = finalProject.segments.reduce(
+            (acc: number, seg: any) => acc + (seg.duration || 0),
+            0,
+          );
+          console.log(
+            `Total video duration: ${totalDuration.toFixed(2)}s for ${finalProject.segments.length} segments`,
+          );
+
+          // Update project status to completed
+          await ProjectAPI.updateProject(projectId, {
+            status: 'completed',
+            duration: totalDuration,
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to finalize project:', error);
       }
 
       setCurrentStep("Video creation complete!");

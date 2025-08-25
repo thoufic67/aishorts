@@ -368,7 +368,7 @@ export class MigrationUtils {
           originalPath: filePath,
           migratedAt: new Date().toISOString(),
         },
-      }, userId);
+      });
 
       console.log(`✅ Local file migrated: ${filePath} → ${url}`);
       return fileRecord;

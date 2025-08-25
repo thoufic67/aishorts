@@ -255,10 +255,10 @@ export class ApiClient {
   }
 
   /**
-   * Get a specific project by ID
+   * Get a specific project by ID with segments and files
    */
   static async getProject(projectId: string): Promise<Project> {
-    return this.request<Project>(`/api/projects/${projectId}`);
+    return this.request<Project>(`/api/projects/${projectId}?include=details`);
   }
 
   /**

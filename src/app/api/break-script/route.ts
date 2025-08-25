@@ -31,21 +31,22 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: "system",
-          content: `You are a video script editor. Break down the provided script into meaningful chunks that would work well for short video segments. Each chunk should:
+          content: `You are a video script segmenter. Break down the provided script into meaningful chunks WITHOUT modifying the original text. Each chunk should:
 1. Be 3-5 seconds of speaking time (roughly 8-15 words)
 2. Form a complete thought or sentence fragment that makes sense
 3. Be suitable for generating a single image that represents the content
 4. Flow naturally from one chunk to the next
 5. There can be a maximum of only 10 chunks
+6. IMPORTANT: Use the EXACT original text without any modifications, corrections, or improvements
 
-The response will be structured as a JSON object with a "chunks" array containing the script segments.`,
+The response will be structured as a JSON object with a "chunks" array containing the original script segments.`,
         },
         {
           role: "user",
           content: script,
         },
       ],
-      temperature: 0.3,
+      temperature: 1,
       response_format: {
         type: "json_schema",
         json_schema: API_SCHEMAS.scriptChunks,

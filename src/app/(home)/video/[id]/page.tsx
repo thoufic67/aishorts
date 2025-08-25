@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Layers,
@@ -12,53 +12,62 @@ import {
   MoreHorizontal,
   Download,
   Share,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Loading } from "@/components/ui/loading";
 import { VideoPlayerPanel } from "@/components/video-editor/video-player-panel";
 import { VideoEditorHeader } from "@/components/video-editor/video-editor-header";
 import type { VideoGenerationData, VideoSegment, Layer } from "@/types/video";
+import type { Project } from "@/types/project";
+import { useProject } from "@/hooks/use-projects";
 import { VIDEO_DATA } from "@/lib/video-mock-data";
-import {
-  ProjectStorage,
-  type ProjectData,
-} from "@/lib/project-storage";
+import { ProjectAPI } from "@/lib/project-api";
 
-// Convert ProjectData to VideoGenerationData format
-function convertProjectDataToVideoData(
-  projectData: ProjectData,
+
+// Convert Project to VideoGenerationData format
+function convertProjectToVideoData(
+  project: Project,
 ): VideoGenerationData {
-  const segments: VideoSegment[] = (projectData.segments || []).map(
-    (segment, index) => ({
-      text: segment.text,
-      imagePrompt: segment.imagePrompt,
-      imageUrl: segment.imageUrl || "",
-      audioUrl: segment.audioUrl || "",
-      audioVolume: 1,
-      playBackRate: 1,
-      duration: segment.duration || 5,
-      withBlur: false,
-      wordTimings: [],
-      backgroundMinimized: false,
-      order: segment.order,
-      media: segment.imageUrl
-        ? [
-            {
-              effect: "none",
-              url: segment.imageUrl,
-              withBlur: false,
-              top: 0,
-              left: 0,
-              width: 1080,
-              height: 1920,
-              borderRadius: 10,
-              volume: 0,
-              _id: `media_${index}`,
-            },
-          ]
-        : [],
-      elements: [],
-      _id: `segment_${index}`,
-    }),
+  const segments: VideoSegment[] = (project.segments || []).map(
+    (segment, index) => {
+      // Find associated image and audio files
+      const imageFile = segment.files?.find(f => f.fileType === 'image');
+      const audioFile = segment.files?.find(f => f.fileType === 'audio');
+      
+      return {
+        text: segment.text,
+        imagePrompt: segment.imagePrompt,
+        imageUrl: imageFile?.r2Url || "",
+        audioUrl: audioFile?.r2Url || "",
+        audioVolume: segment.audioVolume || 1,
+        playBackRate: segment.playBackRate || 1,
+        duration: segment.duration || 5,
+        withBlur: segment.withBlur || false,
+        wordTimings: segment.wordTimings || [],
+        backgroundMinimized: segment.backgroundMinimized || false,
+        order: segment.order,
+        media: imageFile?.r2Url
+          ? [
+              {
+                effect: "none",
+                url: imageFile.r2Url,
+                withBlur: segment.withBlur || false,
+                top: 0,
+                left: 0,
+                width: 1080,
+                height: 1920,
+                borderRadius: 10,
+                volume: 0,
+                _id: `media_${segment.id}`,
+              },
+            ]
+          : [],
+        elements: [],
+        _id: segment.id,
+      };
+    },
   );
 
   // Create audio layers for playback
@@ -92,7 +101,7 @@ function convertProjectDataToVideoData(
         type: "combinedAudio" as const,
         url: firstAudioUrl, // Use first audio URL as combined audio
         volume: 1,
-        _id: `combined_audio_${projectData.id}`,
+        _id: `combined_audio_${project.id}`,
       });
     }
   }
@@ -116,17 +125,17 @@ function convertProjectDataToVideoData(
     },
     type: "captions" as const,
     volume: 0.2,
-    _id: `captions_${projectData.id}`,
+    _id: `captions_${project.id}`,
   });
 
   return {
     video: {
       selectedMedia: { images: [], videos: [] },
-      format: { width: 1080, height: 1920 },
-      _id: projectData.id,
+      format: project.format || { width: 1080, height: 1920 },
+      _id: project.id,
       user: "user",
       status: "completed",
-      script: projectData.script,
+      script: project.script || "",
       voice: "openai_echo",
       type: "faceless_video",
       mediaType: "images",
@@ -139,10 +148,10 @@ function convertProjectDataToVideoData(
       segments,
       layers,
       tracks: [],
-      createdAt: new Date(projectData.createdAt).toISOString(),
-      updatedAt: new Date(projectData.updatedAt).toISOString(),
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
       __v: 0,
-      title: projectData.title,
+      title: project.title,
     },
     userPlan: {
       isPremium: false,
@@ -153,94 +162,118 @@ function convertProjectDataToVideoData(
 
 export default function VideoEditorPage() {
   const params = useParams();
+  const router = useRouter();
   const videoId = params.id as string;
+  const { data: project, isLoading, error, refetch } = useProject(videoId);
   const [videoData, setVideoData] = useState<VideoGenerationData | null>(null);
   const [selectedFrameIndex, setSelectedFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
 
-  const handleSegmentUpdate = (index: number, updatedSegment: VideoSegment) => {
-    if (!videoData) return;
+  const handleSegmentUpdate = async (index: number, updatedSegment: VideoSegment) => {
+    if (!videoData || !project) return;
 
-    const updatedSegments = [...videoData.video.segments];
-    updatedSegments[index] = updatedSegment;
+    try {
+      // Update the segment via API
+      const segmentId = updatedSegment._id;
+      await ProjectAPI.updateSegment(project.id, segmentId, {
+        text: updatedSegment.text,
+        imagePrompt: updatedSegment.imagePrompt,
+        duration: updatedSegment.duration,
+        audioVolume: updatedSegment.audioVolume,
+        playBackRate: updatedSegment.playBackRate,
+        withBlur: updatedSegment.withBlur,
+        backgroundMinimized: updatedSegment.backgroundMinimized,
+        wordTimings: updatedSegment.wordTimings,
+        order: updatedSegment.order,
+      });
 
-    const updatedVideoData = {
-      ...videoData,
-      video: {
-        ...videoData.video,
-        segments: updatedSegments,
-      },
-    };
+      // Update local state
+      const updatedSegments = [...videoData.video.segments];
+      updatedSegments[index] = updatedSegment;
 
-    setVideoData(updatedVideoData);
-
-    // Update project storage if this video came from there
-    const projectData = ProjectStorage.getProject(videoId);
-    if (projectData) {
-      const updatedProjectData = {
-        ...projectData,
-        segments: updatedSegments.map((segment) => ({
-          text: segment.text,
-          imagePrompt: segment.imagePrompt,
-          imageUrl: segment.imageUrl,
-          audioUrl: segment.audioUrl,
-          duration: segment.duration,
-          order: segment.order,
-        })),
-        updatedAt: Date.now(),
+      const updatedVideoData = {
+        ...videoData,
+        video: {
+          ...videoData.video,
+          segments: updatedSegments,
+        },
       };
-      ProjectStorage.saveProject(updatedProjectData);
+
+      setVideoData(updatedVideoData);
+
+      // Optionally refresh project data to ensure consistency
+      refetch();
+    } catch (error) {
+      console.error("Failed to update segment:", error);
+      // Show user-friendly error message
+      alert(`Failed to update segment: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
-  const handleSegmentInsert = (
+  const handleSegmentInsert = async (
     insertAfterIndex: number,
     newSegment: VideoSegment,
   ) => {
-    if (!videoData) return;
+    if (!videoData || !project) return;
 
-    const updatedSegments = [...videoData.video.segments];
+    try {
+      // Create the new segment via API
+      const insertIndex = insertAfterIndex + 1;
+      
+      const createdSegment = await ProjectAPI.createSegment(project.id, {
+        order: insertIndex,
+        text: newSegment.text,
+        imagePrompt: newSegment.imagePrompt,
+        duration: newSegment.duration,
+        audioVolume: newSegment.audioVolume,
+        playBackRate: newSegment.playBackRate,
+        withBlur: newSegment.withBlur,
+        backgroundMinimized: newSegment.backgroundMinimized,
+        wordTimings: newSegment.wordTimings,
+      });
 
-    // Insert at the correct position
-    const insertIndex = insertAfterIndex + 1;
-    updatedSegments.splice(insertIndex, 0, newSegment);
+      // Update local state
+      const updatedSegments = [...videoData.video.segments];
+      updatedSegments.splice(insertIndex, 0, {
+        ...newSegment,
+        _id: createdSegment.id,
+      });
 
-    // Update order values for all segments after the insertion point
-    updatedSegments.forEach((segment, index) => {
-      segment.order = index;
-    });
+      // Update order values for all segments after the insertion point
+      updatedSegments.forEach((segment, index) => {
+        segment.order = index;
+      });
 
-    const updatedVideoData = {
-      ...videoData,
-      video: {
-        ...videoData.video,
-        segments: updatedSegments,
-      },
-    };
+      // Update segment orders in the API for segments that changed
+      const updatePromises = updatedSegments
+        .slice(insertIndex + 1)
+        .map((segment, idx) => 
+          ProjectAPI.updateSegment(project.id, segment._id, { order: insertIndex + 1 + idx })
+        );
+      
+      await Promise.all(updatePromises);
 
-    setVideoData(updatedVideoData);
-
-    // Update project storage if this video came from there
-    const projectData = ProjectStorage.getProject(videoId);
-    if (projectData) {
-      const updatedProjectData = {
-        ...projectData,
-        segments: updatedSegments.map((segment) => ({
-          text: segment.text,
-          imagePrompt: segment.imagePrompt,
-          imageUrl: segment.imageUrl,
-          audioUrl: segment.audioUrl,
-          duration: segment.duration,
-          order: segment.order,
-        })),
-        updatedAt: Date.now(),
+      const updatedVideoData = {
+        ...videoData,
+        video: {
+          ...videoData.video,
+          segments: updatedSegments,
+        },
       };
-      ProjectStorage.saveProject(updatedProjectData);
-    }
 
-    // Select the newly inserted frame
-    setSelectedFrameIndex(insertIndex);
+      setVideoData(updatedVideoData);
+
+      // Select the newly inserted frame
+      setSelectedFrameIndex(insertIndex);
+
+      // Refresh project data to ensure consistency
+      refetch();
+    } catch (error) {
+      console.error("Failed to insert segment:", error);
+      // Show user-friendly error message
+      alert(`Failed to insert segment: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   };
 
   const handleExport = async (quality: string) => {
@@ -284,18 +317,29 @@ export default function VideoEditorPage() {
 
 
   useEffect(() => {
-    // Try to load from project storage first
-    const projectData = ProjectStorage.getProject(videoId);
-
-    if (projectData) {
-      // Convert project data to video data format
-      const convertedVideoData = convertProjectDataToVideoData(projectData);
+    if (project) {
+      console.log('Converting project data:', {
+        projectId: project.id,
+        segmentCount: project.segments?.length || 0,
+        segments: project.segments?.map(s => ({
+          id: s.id,
+          text: s.text.substring(0, 50) + '...',
+          filesCount: s.files?.length || 0,
+          files: s.files?.map(f => ({ type: f.fileType, url: f.r2Url })) || []
+        }))
+      });
+      
+      // Convert API project data to video data format
+      const convertedVideoData = convertProjectToVideoData(project);
       setVideoData(convertedVideoData);
-    } else {
-      // Fallback to mock data
-      setVideoData(VIDEO_DATA);
+      
+      console.log('Converted video data:', {
+        segmentCount: convertedVideoData.video.segments.length,
+        segmentsWithImages: convertedVideoData.video.segments.filter(s => s.imageUrl).length,
+        segmentsWithAudio: convertedVideoData.video.segments.filter(s => s.audioUrl).length,
+      });
     }
-  }, [videoId]);
+  }, [project]);
 
   // Calculate total duration
   const totalDuration =
@@ -322,10 +366,71 @@ export default function VideoEditorPage() {
     return () => clearInterval(interval);
   }, [isPlaying, totalDuration, videoData]);
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <Loading size="lg" />
+          <div className="text-lg text-foreground">Loading project...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Card className="p-8 text-center">
+          <div className="mb-4 text-destructive">
+            <AlertCircle className="mx-auto h-12 w-12" />
+          </div>
+          <h3 className="mb-2 text-lg font-semibold">Failed to load project</h3>
+          <p className="mb-4 text-foreground/70">
+            {error.message || "Something went wrong while loading the project."}
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button variant="outline" onClick={() => router.push('/dashboard')}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Dashboard
+            </Button>
+            <Button onClick={() => refetch()}>Try Again</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Project not found
+  if (!project) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Card className="p-8 text-center">
+          <div className="mb-4 text-foreground/30">
+            <AlertCircle className="mx-auto h-12 w-12" />
+          </div>
+          <h3 className="mb-2 text-lg font-semibold">Project not found</h3>
+          <p className="mb-4 text-foreground/70">
+            The project you're looking for doesn't exist or you don't have access to it.
+          </p>
+          <Button variant="outline" onClick={() => router.push('/dashboard')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  // Video data not ready
   if (!videoData) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading video...</div>
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <Loading size="lg" />
+          <div className="text-lg text-foreground">Preparing video editor...</div>
+        </div>
       </div>
     );
   }
@@ -345,6 +450,7 @@ export default function VideoEditorPage() {
       <div className="flex-1">
         <VideoPlayerPanel
           video={videoData.video}
+          projectId={project.id}
           isPlaying={isPlaying}
           onPlayPause={() => setIsPlaying(!isPlaying)}
           currentTime={currentTime}

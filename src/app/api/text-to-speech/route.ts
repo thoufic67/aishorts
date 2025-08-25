@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import OpenAI from "openai";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
+import { R2Storage } from "@/lib/r2-storage";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -18,7 +17,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { text, voice = "echo", index } = await request.json();
+    const { text, voice = "echo", index, projectId, segmentId } = await request.json();
 
     if (!text || typeof text !== "string") {
       return NextResponse.json(
@@ -41,23 +40,26 @@ export async function POST(request: NextRequest) {
       input: text,
     });
 
-    // Create temp directory if it doesn't exist
-    const tempDir = join(process.cwd(), "public", "temp");
-    await mkdir(tempDir, { recursive: true });
-
-    // Generate unique filename
-    const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const filename = `audio_${index}_${Date.now()}.mp3`;
-    const filepath = join(tempDir, filename);
-
-    // Convert response to buffer and save
+    // Convert response to buffer
     const buffer = Buffer.from(await mp3.arrayBuffer());
-    await writeFile(filepath, buffer);
 
-    // Return the public URL
-    const audioUrl = `/temp/${filename}`;
+    // Generate project ID if not provided
+    const finalProjectId = projectId || `project_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-    return NextResponse.json({ audioUrl });
+    // Upload to R2 storage
+    const { key, url } = await R2Storage.uploadAudio(
+      buffer,
+      session.user.id!,
+      finalProjectId,
+      index,
+      segmentId
+    );
+
+    return NextResponse.json({ 
+      audioUrl: url,
+      key,
+      projectId: finalProjectId
+    });
   } catch (error) {
     console.error("Error generating speech:", error);
     return NextResponse.json(

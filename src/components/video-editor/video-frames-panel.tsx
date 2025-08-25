@@ -51,7 +51,14 @@ export function VideoFramesPanel({
   useEffect(() => {
     console.log("VideoFramesPanel - editingState:", editingState);
     if (editingState) {
-      console.log("VideoFramesPanel - segment for editingState:", segments[editingState.index] ? "found" : "not found", "index:", editingState.index, "segments length:", segments.length);
+      console.log(
+        "VideoFramesPanel - segment for editingState:",
+        segments[editingState.index] ? "found" : "not found",
+        "index:",
+        editingState.index,
+        "segments length:",
+        segments.length,
+      );
     }
   }, [editingState, segments]);
 
@@ -99,7 +106,11 @@ export function VideoFramesPanel({
       <EditSegmentDialog
         isOpen={editingState !== null}
         onClose={closeEditDialog}
-        segment={editingState && segments[editingState.index] ? segments[editingState.index] : null}
+        segment={
+          editingState && segments[editingState.index]
+            ? segments[editingState.index]
+            : null
+        }
         segmentIndex={editingState?.index ?? -1}
         onRegenerateImage={handleRegenerateImage}
         onRegenerateAudio={handleRegenerateAudio}

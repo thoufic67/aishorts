@@ -86,6 +86,39 @@ export class R2Storage {
   }
 
   /**
+   * Upload an audio buffer with organized folder structure
+   */
+  static async uploadAudio(
+    buffer: Buffer, 
+    userId: string, 
+    projectId: string, 
+    index: number,
+    segmentId?: string
+  ): Promise<{key: string, url: string}> {
+    try {
+      // Generate unique filename
+      const fileId = uuidv4();
+      const timestamp = Date.now();
+      const filename = `audio_${index}_${timestamp}.mp3`;
+      
+      // Create organized folder structure: /{userId}/{projectId}/{segmentId?}/audio/
+      const folderPath = segmentId 
+        ? `${userId}/${projectId}/${segmentId}/audio`
+        : `${userId}/${projectId}/audio`;
+      
+      const key = `${folderPath}/${filename}`;
+      const contentType = 'audio/mpeg';
+      
+      const url = await this.uploadFile(buffer, key, contentType);
+      
+      return { key, url };
+    } catch (error) {
+      console.error('Error uploading audio to R2:', error);
+      throw new Error('Failed to upload audio to R2 storage');
+    }
+  }
+
+  /**
    * Delete a file from R2 storage
    */
   static async deleteFile(key: string): Promise<void> {

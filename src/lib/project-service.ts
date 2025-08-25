@@ -99,7 +99,7 @@ export class ProjectService {
   }
 
   /**
-   * Get project with all segments and files
+   * Get project with all segments and files (with files properly associated to segments)
    */
   static async getProjectWithDetails(projectId: string, userId: string) {
     try {
@@ -109,10 +109,22 @@ export class ProjectService {
       const segments = await this.getProjectSegments(projectId, userId);
       const files = await this.getProjectFiles(projectId, userId);
 
+      // Associate files with their respective segments
+      const segmentsWithFiles = segments.map(segment => {
+        const segmentFiles = files.filter(file => file.segmentId === segment.id);
+        return {
+          ...segment,
+          files: segmentFiles,
+        };
+      });
+
+      // Files not associated with any segment (project-level files)
+      const projectFiles = files.filter(file => !file.segmentId);
+
       return {
         ...project,
-        segments,
-        files,
+        segments: segmentsWithFiles,
+        files: projectFiles, // Only project-level files here
       };
     } catch (error) {
       console.error('Error getting project with details:', error);
@@ -235,6 +247,45 @@ export class ProjectService {
     } catch (error) {
       console.error('Error creating segment:', error);
       throw new Error('Failed to create segment');
+    }
+  }
+
+  /**
+   * Create multiple segments in a batch
+   */
+  static async createSegmentsBatch(
+    projectId: string, 
+    userId: string, 
+    segmentsData: CreateSegmentData[]
+  ): Promise<ProjectSegment[]> {
+    try {
+      // Verify project ownership
+      const project = await this.getProject(projectId, userId);
+      if (!project) {
+        throw new Error('Project not found or access denied');
+      }
+
+      // Prepare all segment data for batch insert
+      const segmentValues = segmentsData.map(data => ({
+        projectId,
+        order: data.order,
+        text: data.text,
+        imagePrompt: data.imagePrompt,
+        duration: data.duration,
+        audioVolume: data.audioVolume,
+        playBackRate: data.playBackRate,
+        withBlur: data.withBlur,
+        backgroundMinimized: data.backgroundMinimized,
+        wordTimings: data.wordTimings,
+      }));
+
+      // Batch insert all segments
+      const segments = await db.insert(projectSegments).values(segmentValues).returning();
+
+      return segments;
+    } catch (error) {
+      console.error('Error creating segments batch:', error);
+      throw new Error('Failed to create segments batch');
     }
   }
 

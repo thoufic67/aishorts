@@ -70,12 +70,11 @@ export function EditSegmentDialog({
       setImageModel("flux-schnell");
       setVoice("echo");
     }
+    if (!segment) {
+      console.log("EditSegmentDialog: No segment provided, returning null");
+      return null;
+    }
   }, [segment]);
-
-  if (!segment) {
-    console.log("EditSegmentDialog: No segment provided, returning null");
-    return null;
-  }
 
   const handleRegenerateImage = () => {
     void onRegenerateImage(segmentIndex, imagePrompt, imageModel);

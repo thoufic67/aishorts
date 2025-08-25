@@ -16,7 +16,13 @@ const CreateSegmentSchema = z.object({
   wordTimings: z.record(z.string(), z.any()).optional(),
 });
 
+// Batch creation schema
+const CreateBatchSegmentsSchema = z.object({
+  segments: z.array(CreateSegmentSchema).min(1, 'At least one segment is required'),
+});
+
 type CreateSegmentRequest = z.infer<typeof CreateSegmentSchema>;
+type CreateBatchSegmentsRequest = z.infer<typeof CreateBatchSegmentsSchema>;
 
 /**
  * GET /api/projects/[id]/segments
@@ -69,7 +75,7 @@ export async function GET(
 
 /**
  * POST /api/projects/[id]/segments
- * Create a new segment for a project
+ * Create new segment(s) for a project. Supports both single segment and batch creation.
  */
 export async function POST(
   request: NextRequest,
@@ -86,25 +92,56 @@ export async function POST(
     }
 
     const body = await request.json();
+    const projectId = params.id;
+
+    // Check if this is a batch creation request
+    const batchValidation = CreateBatchSegmentsSchema.safeParse(body);
     
-    // Validate request body
-    const validationResult = CreateSegmentSchema.safeParse(body);
+    if (batchValidation.success) {
+      // Batch creation
+      const { segments } = batchValidation.data;
+      
+      const createdSegments = await ProjectService.createSegmentsBatch(
+        projectId, 
+        session.user.id, 
+        segments.map(segment => ({
+          order: segment.order,
+          text: segment.text,
+          imagePrompt: segment.imagePrompt,
+          duration: segment.duration || undefined,
+          audioVolume: segment.audioVolume || 1.0,
+          playBackRate: segment.playBackRate || 1.0,
+          withBlur: segment.withBlur || false,
+          backgroundMinimized: segment.backgroundMinimized || false,
+          wordTimings: segment.wordTimings || null,
+        }))
+      );
+
+      return NextResponse.json({
+        success: true,
+        data: createdSegments,
+        count: createdSegments.length,
+        message: `${createdSegments.length} segments created successfully`,
+      }, { status: 201 });
+    }
+
+    // Single segment creation
+    const singleValidation = CreateSegmentSchema.safeParse(body);
     
-    if (!validationResult.success) {
+    if (!singleValidation.success) {
       return NextResponse.json(
         { 
           success: false, 
           error: 'Invalid request data',
-          details: validationResult.error.issues,
+          details: singleValidation.error.issues,
         },
         { status: 400 }
       );
     }
 
-    const segmentData: CreateSegmentRequest = validationResult.data;
-    const projectId = params.id;
+    const segmentData: CreateSegmentRequest = singleValidation.data;
 
-    // Create segment with default values
+    // Create single segment
     const newSegment = await ProjectService.createSegment(projectId, session.user.id, {
       order: segmentData.order,
       text: segmentData.text,
@@ -144,7 +181,7 @@ export async function POST(
     return NextResponse.json(
       { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Failed to create segment' 
+        error: error instanceof Error ? error.message : 'Failed to create segment(s)' 
       },
       { status: 500 }
     );

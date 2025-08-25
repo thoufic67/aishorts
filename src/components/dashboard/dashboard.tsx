@@ -24,7 +24,7 @@ import { MigrationBanner } from "@/components/migration";
 const Dashboard = () => {
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const router = useRouter();
-  
+
   const { data: projects = [], isLoading, error, refetch } = useProjects();
   const deleteProject = useDeleteProject();
 
@@ -34,24 +34,27 @@ const Dashboard = () => {
 
   const handleOpenProject = (projectId: string) => {
     // Set current project is handled by the project client
-    router.push(`/project/${projectId}/workflow`);
+    router.push(`/video/${projectId}`);
   };
 
-  const handleDeleteProject = async (projectId: string, e: React.MouseEvent) => {
+  const handleDeleteProject = async (
+    projectId: string,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
     setDeleteProjectId(projectId);
   };
 
   const confirmDeleteProject = async () => {
     if (!deleteProjectId) return;
-    
+
     try {
       await deleteProject.mutateAsync(deleteProjectId);
-      toast.success('Project deleted successfully');
+      toast.success("Project deleted successfully");
       setDeleteProjectId(null);
     } catch (error) {
-      toast.error('Failed to delete project');
-      console.error('Delete error:', error);
+      toast.error("Failed to delete project");
+      console.error("Delete error:", error);
     }
   };
 
@@ -168,7 +171,7 @@ const Dashboard = () => {
             {Array.from({ length: 6 }).map((_, i) => (
               <Card key={i} className="overflow-hidden">
                 <Skeleton className="aspect-video w-full" />
-                <div className="p-4 space-y-2">
+                <div className="space-y-2 p-4">
                   <Skeleton className="h-5 w-3/4" />
                   <div className="flex justify-between">
                     <Skeleton className="h-4 w-20" />
@@ -185,16 +188,17 @@ const Dashboard = () => {
         {/* Error State */}
         {error && (
           <Card className="bg-card/30 p-8 text-center backdrop-blur-sm">
-            <div className="text-destructive mb-4">
+            <div className="mb-4 text-destructive">
               <Video className="mx-auto h-12 w-12" />
             </div>
-            <h3 className="mb-2 text-lg font-semibold">Failed to load projects</h3>
+            <h3 className="mb-2 text-lg font-semibold">
+              Failed to load projects
+            </h3>
             <p className="mb-4 text-foreground/70">
-              {error.message || "Something went wrong while loading your projects."}
+              {error.message ||
+                "Something went wrong while loading your projects."}
             </p>
-            <Button onClick={() => refetch()}>
-              Try Again
-            </Button>
+            <Button onClick={() => refetch()}>Try Again</Button>
           </Card>
         )}
 
@@ -203,9 +207,9 @@ const Dashboard = () => {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => {
               const status = getProjectStatus(project);
-              const thumbnailImage = project.segments?.find(s => 
-                s.files?.some(f => f.fileType === 'image')
-              )?.files?.find(f => f.fileType === 'image')?.r2Url;
+              const thumbnailImage = project.segments
+                ?.find((s) => s.files?.some((f) => f.fileType === "image"))
+                ?.files?.find((f) => f.fileType === "image")?.r2Url;
 
               return (
                 <Card
@@ -246,7 +250,8 @@ const Dashboard = () => {
                         onClick={(e) => handleDeleteProject(project.id, e)}
                         disabled={deleteProject.isPending}
                       >
-                        {deleteProject.isPending && deleteProjectId === project.id ? (
+                        {deleteProject.isPending &&
+                        deleteProjectId === project.id ? (
                           <Loading size="sm" />
                         ) : (
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -318,25 +323,29 @@ const Dashboard = () => {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={!!deleteProjectId} onOpenChange={() => setDeleteProjectId(null)}>
+      <Dialog
+        open={!!deleteProjectId}
+        onOpenChange={() => setDeleteProjectId(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Project</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this project? This action cannot be undone.
-              All associated files and data will be permanently removed.
+              Are you sure you want to delete this project? This action cannot
+              be undone. All associated files and data will be permanently
+              removed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setDeleteProjectId(null)}
               disabled={deleteProject.isPending}
             >
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={confirmDeleteProject}
               disabled={deleteProject.isPending}
             >
@@ -346,7 +355,7 @@ const Dashboard = () => {
                   Deleting...
                 </>
               ) : (
-                'Delete Project'
+                "Delete Project"
               )}
             </Button>
           </DialogFooter>

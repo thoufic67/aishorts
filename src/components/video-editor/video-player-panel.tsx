@@ -135,7 +135,7 @@ export function VideoPlayerPanel({
 
   // Calculate frame number for display
   const fps = 30;
-  const totalFrames = Math.floor(effectiveTotalDuration * fps);
+  const totalFrames = Math.max(1, Math.floor(effectiveTotalDuration * fps)); // Ensure at least 1 frame
 
   // Enhanced segment update handler
   const handleSegmentUpdate = async (index: number, updatedSegment: VideoSegment) => {
@@ -288,15 +288,24 @@ export function VideoPlayerPanel({
             />
 
             {/* Play/Pause overlay */}
-            {!isPlaying && (
+            {!effectiveIsPlaying && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Button
-                  onClick={onPlayPause}
+                  onClick={effectiveOnPlayPause}
                   size="lg"
                   className="h-16 w-16 rounded-full bg-background/20 p-0 text-background shadow-lg backdrop-blur-sm hover:bg-background/30"
                 >
                   <Play className="ml-1 h-8 w-8" />
                 </Button>
+              </div>
+            )}
+
+            {/* Database status indicator */}
+            {video && (
+              <div className="absolute top-2 left-2">
+                <Badge variant="secondary" className="text-xs">
+                  Database
+                </Badge>
               </div>
             )}
           </div>
@@ -310,12 +319,12 @@ export function VideoPlayerPanel({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
-                onClick={onPlayPause}
+                onClick={effectiveOnPlayPause}
                 size="sm"
                 variant="ghost"
                 className="text-default hover:bg-default/20 h-10 w-10 rounded-full bg-white/10"
               >
-                {isPlaying ? (
+                {effectiveIsPlaying ? (
                   <Pause className="h-5 w-5" />
                 ) : (
                   <Play className="ml-0.5 h-5 w-5" />
@@ -354,8 +363,13 @@ export function VideoPlayerPanel({
             {/* Time Display */}
             <div className="text-default/70 flex items-center gap-4 font-mono text-sm">
               <span>
-                {formatTime(currentTime)} / {formatTime(totalDuration)}
+                {formatTime(effectiveCurrentTime)} / {formatTime(effectiveTotalDuration)}
               </span>
+              {currentSegmentInfo && (
+                <Badge variant="outline" className="text-xs">
+                  Segment {currentSegmentInfo.index + 1}
+                </Badge>
+              )}
             </div>
 
             <Button
@@ -373,30 +387,53 @@ export function VideoPlayerPanel({
             <div className="bg-default/20 h-1 w-full rounded-full">
               <div
                 className="h-1 rounded-full bg-blue-500 transition-all duration-150"
-                style={{ width: `${(currentTime / totalDuration) * 100}%` }}
+                style={{ width: `${(effectiveCurrentTime / effectiveTotalDuration) * 100}%` }}
               />
             </div>
             <div
               className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-blue-500 shadow-md"
-              style={{ left: `${(currentTime / totalDuration) * 100}%` }}
+              style={{ left: `${(effectiveCurrentTime / effectiveTotalDuration) * 100}%` }}
             />
           </div>
 
           {/* Horizontal Segment Panel */}
-
           <VideoFramesPanel
-            segments={video.segments}
-            selectedFrameIndex={selectedFrameIndex}
-            onFrameSelect={onFrameSelect}
-            currentTime={currentTime}
-            totalDuration={totalDuration}
-            onSegmentUpdate={onSegmentUpdate}
-            onSegmentInsert={onSegmentInsert}
+            segments={effectiveVideo.segments}
+            selectedFrameIndex={effectiveSelectedFrameIndex}
+            onFrameSelect={effectiveOnFrameSelect}
+            currentTime={effectiveCurrentTime}
+            totalDuration={effectiveTotalDuration}
+            onSegmentUpdate={handleSegmentUpdate}
+            onSegmentInsert={legacyOnSegmentInsert}
             orientation="horizontal"
             showHeader={false}
           />
         </div>
       </div>
+
+      {/* File Upload Dialog */}
+      <Dialog open={showFileUpload} onOpenChange={setShowFileUpload}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Upload Files</DialogTitle>
+          </DialogHeader>
+          {uploadSegmentId && (
+            <FileUpload
+              projectId={projectId}
+              segmentId={uploadSegmentId}
+              onUploadComplete={(file) => {
+                toast.success(`${file.originalName} uploaded successfully`);
+                setShowFileUpload(false);
+                setUploadSegmentId(null);
+              }}
+              onUploadError={(error) => {
+                toast.error(`Upload failed: ${error}`);
+              }}
+              multiple={true}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

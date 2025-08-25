@@ -88,7 +88,7 @@ export class VideoProjectAdapter {
         audioUrl: audioFile?.r2Url || audioFile?.tempUrl || '',
         audioVolume: segment.audioVolume,
         playBackRate: segment.playBackRate,
-        duration: segment.duration || 0,
+        duration: Math.max(1, segment.duration || 5), // Default to 5 seconds minimum
         withBlur: segment.withBlur,
         backgroundMinimized: segment.backgroundMinimized,
         order: segment.order,
@@ -160,7 +160,9 @@ export class VideoProjectAdapter {
    * Calculate total video duration from segments
    */
   static calculateTotalDuration(segments: VideoSegment[]): number {
-    return segments.reduce((total, segment) => total + (segment.duration || 0), 0);
+    const totalDuration = segments.reduce((total, segment) => total + (segment.duration || 0), 0);
+    // Return at least 1 second duration to prevent player errors
+    return Math.max(1, totalDuration);
   }
 
   /**
