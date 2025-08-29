@@ -48,19 +48,19 @@ export function VideoFramesPanel({
 
   const isHorizontal = orientation === "horizontal";
 
-  useEffect(() => {
-    console.log("VideoFramesPanel - editingState:", editingState);
-    if (editingState) {
-      console.log(
-        "VideoFramesPanel - segment for editingState:",
-        segments[editingState.index] ? "found" : "not found",
-        "index:",
-        editingState.index,
-        "segments length:",
-        segments.length,
-      );
-    }
-  }, [editingState, segments]);
+  // useEffect(() => {
+  //   console.log("VideoFramesPanel - editingState:", editingState);
+  //   if (editingState) {
+  //     console.log(
+  //       "VideoFramesPanel - segment for editingState:",
+  //       segments[editingState.index] ? "found" : "not found",
+  //       "index:",
+  //       editingState.index,
+  //       "segments length:",
+  //       segments.length,
+  //     );
+  //   }
+  // }, [editingState, segments]);
 
   return (
     <div className={isHorizontal ? "w-full" : "w-80 border-r bg-white"}>

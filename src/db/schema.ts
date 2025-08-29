@@ -129,7 +129,75 @@ export const projects = pgTable("project", {
   settings: jsonb("settings"),
   // Only store non-relational data as JSON
   transcripts: jsonb("transcripts"),
-  scriptLines: jsonb("scriptLines"), 
+  scriptLines: jsonb("scriptLines"),
+  // Video generation specific fields
+  voice: text("voice").default("openai_echo"),
+  type: text("type").default("faceless_video"),
+  mediaType: text("mediaType").default("images"),
+  isRemotion: boolean("isRemotion").default(true),
+  selectedModel: text("selectedModel").default("basic"),
+  audioType: text("audioType").default("library"),
+  audioPrompt: text("audioPrompt"),
+  watermark: boolean("watermark").default(true),
+  isFeatured: boolean("isFeatured").default(false),
+  selectedMedia: jsonb("selectedMedia").$type<{images: string[], videos: string[]}>().default({images: [], videos: []}),
+  tiktokDescription: text("tiktokDescription"),
+  youtubeDescription: text("youtubeDescription"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+// Overlay Assets Table
+export const overlayAssets = pgTable("overlayAsset", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  description: text("description"),
+  author: text("author"),
+  url: text("url").notNull(),
+  preview: text("preview"),
+  type: text("type").notNull().default("overlay"),
+  isPublic: boolean("isPublic").default(true),
+  promptId: text("promptId"),
+  images: jsonb("images").default([]),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+// Project Layers Table
+export const projectLayers = pgTable("projectLayer", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text("projectId").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // 'captions', 'backgroundAudio', 'combinedAudio'
+  captionStyle: jsonb("captionStyle").$type<{
+    fontSize: number;
+    fontFamily: string;
+    activeWordColor: string;
+    inactiveWordColor: string;
+    backgroundColor: string;
+    fontWeight: string;
+    textTransform: string;
+    textShadow: string;
+    wordAnimation: string[];
+    showEmojis: boolean;
+    fromBottom: number;
+    wordsPerBatch: number;
+  }>(),
+  volume: real("volume").default(1.0),
+  url: text("url"),
+  assetId: text("assetId").references(() => overlayAssets.id),
+  order: integer("order").default(0),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+// Project Tracks Table (for future use)
+export const projectTracks = pgTable("projectTrack", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text("projectId").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // 'audio', 'video', 'overlay'
+  settings: jsonb("settings"),
+  order: integer("order").default(0),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });
@@ -146,6 +214,13 @@ export const projectSegments = pgTable("projectSegment", {
   withBlur: boolean("withBlur").default(false),
   backgroundMinimized: boolean("backgroundMinimized").default(false),
   wordTimings: jsonb("wordTimings"),
+  // Direct URL references for easier access
+  imageUrl: text("imageUrl"),
+  audioUrl: text("audioUrl"),
+  // Additional segment properties from mock data
+  media: jsonb("media").default([]),
+  elements: jsonb("elements").default([]),
+  overlayId: text("overlayId").references(() => overlayAssets.id),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });
@@ -186,6 +261,12 @@ export type ProjectSegment = typeof projectSegments.$inferSelect;
 export type NewProjectSegment = typeof projectSegments.$inferInsert;
 export type ProjectFile = typeof projectFiles.$inferSelect;
 export type NewProjectFile = typeof projectFiles.$inferInsert;
+export type ProjectLayer = typeof projectLayers.$inferSelect;
+export type NewProjectLayer = typeof projectLayers.$inferInsert;
+export type ProjectTrack = typeof projectTracks.$inferSelect;
+export type NewProjectTrack = typeof projectTracks.$inferInsert;
+export type OverlayAsset = typeof overlayAssets.$inferSelect;
+export type NewOverlayAsset = typeof overlayAssets.$inferInsert;
 
 export const sql = neon<boolean, boolean>(pgUrl);
 export const db = drizzle(sql, {
@@ -200,5 +281,8 @@ export const db = drizzle(sql, {
     projects,
     projectSegments,
     projectFiles,
+    projectLayers,
+    projectTracks,
+    overlayAssets,
   },
 });

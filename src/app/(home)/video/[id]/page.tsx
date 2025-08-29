@@ -20,95 +20,61 @@ import { Loading } from "@/components/ui/loading";
 import { VideoPlayerPanel } from "@/components/video-editor/video-player-panel";
 import { VideoEditorHeader } from "@/components/video-editor/video-editor-header";
 import type { VideoGenerationData, VideoSegment, Layer } from "@/types/video";
-import type { Project } from "@/types/project";
+import type { ProjectWithDetails } from "@/types/project";
 import { useProject } from "@/hooks/use-projects";
-import { VIDEO_DATA } from "@/lib/video-mock-data";
 import { ProjectAPI } from "@/lib/project-api";
 
 
-// Convert Project to VideoGenerationData format
+// Convert ProjectWithDetails to VideoGenerationData format
 function convertProjectToVideoData(
-  project: Project,
+  project: ProjectWithDetails,
 ): VideoGenerationData {
-  const segments: VideoSegment[] = (project.segments || []).map(
-    (segment, index) => {
-      // Find associated image and audio files
-      const imageFile = segment.files?.find(f => f.fileType === 'image');
-      const audioFile = segment.files?.find(f => f.fileType === 'audio');
-      
-      return {
-        text: segment.text,
-        imagePrompt: segment.imagePrompt,
-        imageUrl: imageFile?.r2Url || "",
-        audioUrl: audioFile?.r2Url || "",
-        audioVolume: segment.audioVolume || 1,
-        playBackRate: segment.playBackRate || 1,
-        duration: segment.duration || 5,
-        withBlur: segment.withBlur || false,
-        wordTimings: segment.wordTimings || [],
-        backgroundMinimized: segment.backgroundMinimized || false,
-        order: segment.order,
-        media: imageFile?.r2Url
-          ? [
-              {
-                effect: "none",
-                url: imageFile.r2Url,
-                withBlur: segment.withBlur || false,
-                top: 0,
-                left: 0,
-                width: 1080,
-                height: 1920,
-                borderRadius: 10,
-                volume: 0,
-                _id: `media_${segment.id}`,
-              },
-            ]
-          : [],
-        elements: [],
-        _id: segment.id,
-      };
-    },
-  );
+  const segments: VideoSegment[] = (project.segments || []).map((segment) => ({
+    text: segment.text,
+    imagePrompt: segment.imagePrompt,
+    imageUrl: segment.imageUrl || "",
+    audioUrl: segment.audioUrl || "",
+    audioVolume: segment.audioVolume || 1,
+    playBackRate: segment.playBackRate || 1,
+    duration: segment.duration || 5,
+    withBlur: segment.withBlur || false,
+    wordTimings: segment.wordTimings || [],
+    backgroundMinimized: segment.backgroundMinimized || false,
+    order: segment.order,
+    media: segment.media || (segment.imageUrl ? [{
+      effect: "none",
+      url: segment.imageUrl,
+      withBlur: segment.withBlur || false,
+      top: 0,
+      left: 0,
+      width: 1080,
+      height: 1920,
+      borderRadius: 10,
+      volume: 0,
+      _id: `media_${segment.id}`,
+    }] : []),
+    elements: segment.elements || [],
+    overlay: segment.overlay ? {
+      is_public: segment.overlay.isPublic,
+      _id: segment.overlay.id,
+      type: segment.overlay.type,
+      name: segment.overlay.name,
+      description: segment.overlay.description || "",
+      author: segment.overlay.author || "",
+      url: segment.overlay.url,
+      preview: segment.overlay.preview || "",
+      prompt: segment.overlay.promptId || null,
+      createdAt: segment.overlay.createdAt,
+      updatedAt: segment.overlay.updatedAt,
+      __v: 0,
+      images: segment.overlay.images || [],
+    } : undefined,
+    _id: segment.id,
+  }));
 
-  // Create audio layers for playback
-  const layers: Layer[] = [];
-
-  // Create a combined audio layer if we have any audio URLs from segments
-  const hasAudio = segments.some((segment) => segment.audioUrl);
-  if (hasAudio) {
-    // For now, we'll create a placeholder combined audio layer
-    // In a real implementation, you'd combine all segment audio files into one
-    const firstAudioUrl = segments.find(
-      (segment) => segment.audioUrl,
-    )?.audioUrl;
-    if (firstAudioUrl) {
-      layers.push({
-        captionStyle: {
-          fontSize: 80,
-          fontFamily: "Inter",
-          activeWordColor: "#ffcd00",
-          inactiveWordColor: "#FFFFFF",
-          backgroundColor: "#000000",
-          fontWeight: "900",
-          textTransform: "uppercase" as const,
-          textShadow:
-            ".1em .1em .1em #000,.1em -.1em .1em #000,-.1em .1em .1em #000,-.1em -.1em .1em #000,.1em .1em .2em #000,.1em -.1em .2em #000,-.1em .1em .2em #000,-.1em -.1em .2em #000,0 0 .1em #000,0 0 .2em #000,0 0 .3em #000,0 0 .4em #000,0 0 .5em #000,0 0 .6em #000",
-          wordAnimation: [],
-          showEmojis: true,
-          fromBottom: 0,
-          wordsPerBatch: 2,
-        },
-        type: "combinedAudio" as const,
-        url: firstAudioUrl, // Use first audio URL as combined audio
-        volume: 1,
-        _id: `combined_audio_${project.id}`,
-      });
-    }
-  }
-
-  // Add captions layer
-  layers.push({
-    captionStyle: {
+  // Convert database layers to video editor format
+  const layers: Layer[] = (project.layers || []).map((layer) => ({
+    captionStyle: layer.captionStyle || {
       fontSize: 75,
       fontFamily: "Inter",
       activeWordColor: "#FFFFFF",
@@ -116,42 +82,68 @@ function convertProjectToVideoData(
       backgroundColor: "transparent",
       fontWeight: "700",
       textTransform: "none" as const,
-      textShadow:
-        ".1em .1em .1em #000,.1em -.1em .1em #000,-.1em .1em .1em #000,-.1em -.1em .1em #000,.1em .1em .2em #000,.1em -.1em .2em #000,-.1em .1em .2em #000,-.1em -.1em .2em #000,0 0 .1em #000,0 0 .2em #000,0 0 .3em #000,0 0 .4em #000,0 0 .5em #000,0 0 .6em #000",
+      textShadow: ".1em .1em .1em #000,.1em -.1em .1em #000,-.1em .1em .1em #000,-.1em -.1em .1em #000,.1em .1em .2em #000,.1em -.1em .2em #000,-.1em .1em .2em #000,-.1em -.1em .2em #000,0 0 .1em #000,0 0 .2em #000,0 0 .3em #000,0 0 .4em #000,0 0 .5em #000,0 0 .6em #000",
       wordAnimation: ["none"],
       showEmojis: true,
       fromBottom: 49,
       wordsPerBatch: 3,
     },
-    type: "captions" as const,
-    volume: 0.2,
-    _id: `captions_${project.id}`,
-  });
+    type: layer.type as any,
+    volume: layer.volume || 0.2,
+    url: layer.url,
+    assetId: layer.assetId,
+    _id: layer.id,
+  }));
+
+  // Add default captions layer if none exist
+  if (layers.length === 0) {
+    layers.push({
+      captionStyle: {
+        fontSize: 75,
+        fontFamily: "Inter",
+        activeWordColor: "#FFFFFF",
+        inactiveWordColor: "#CCCCCC",
+        backgroundColor: "transparent",
+        fontWeight: "700",
+        textTransform: "none" as const,
+        textShadow: ".1em .1em .1em #000,.1em -.1em .1em #000,-.1em .1em .1em #000,-.1em -.1em .1em #000,.1em .1em .2em #000,.1em -.1em .2em #000,-.1em .1em .2em #000,-.1em -.1em .2em #000,0 0 .1em #000,0 0 .2em #000,0 0 .3em #000,0 0 .4em #000,0 0 .5em #000,0 0 .6em #000",
+        wordAnimation: ["none"],
+        showEmojis: true,
+        fromBottom: 49,
+        wordsPerBatch: 3,
+      },
+      type: "captions" as const,
+      volume: 0.2,
+      _id: `captions_${project.id}`,
+    });
+  }
 
   return {
     video: {
-      selectedMedia: { images: [], videos: [] },
+      selectedMedia: project.selectedMedia || { images: [], videos: [] },
       format: project.format || { width: 1080, height: 1920 },
       _id: project.id,
       user: "user",
       status: "completed",
       script: project.script || "",
-      voice: "openai_echo",
-      type: "faceless_video",
-      mediaType: "images",
-      isRemotion: true,
-      selectedModel: "basic",
-      audioType: "library",
-      audioPrompt: "",
-      watermark: true,
-      isFeatured: false,
+      voice: project.voice || "openai_echo",
+      type: project.type || "faceless_video",
+      mediaType: project.mediaType || "images",
+      isRemotion: project.isRemotion ?? true,
+      selectedModel: project.selectedModel || "basic",
+      audioType: project.audioType || "library",
+      audioPrompt: project.audioPrompt || "",
+      watermark: project.watermark ?? true,
+      isFeatured: project.isFeatured ?? false,
       segments,
       layers,
-      tracks: [],
+      tracks: project.tracks || [],
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
       __v: 0,
       title: project.title,
+      tiktokDescription: project.tiktokDescription,
+      youtubeDescription: project.youtubeDescription,
     },
     userPlan: {
       isPremium: false,
@@ -317,7 +309,7 @@ export default function VideoEditorPage() {
 
 
   useEffect(() => {
-    if (project) {
+    if (project && project.id) {
       console.log('Converting project data:', {
         projectId: project.id,
         segmentCount: project.segments?.length || 0,
@@ -339,7 +331,7 @@ export default function VideoEditorPage() {
         segmentsWithAudio: convertedVideoData.video.segments.filter(s => s.audioUrl).length,
       });
     }
-  }, [project]);
+  }, [project?.id, project?.updatedAt]); // Only depend on project ID and update time, not the entire project object
 
   // Calculate total duration
   const totalDuration =

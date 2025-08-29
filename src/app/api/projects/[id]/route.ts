@@ -17,6 +17,22 @@ const UpdateProjectSchema = z.object({
     height: z.number().positive(),
   }).optional(),
   settings: z.record(z.string(), z.any()).optional(),
+  // Video generation fields
+  voice: z.string().optional(),
+  type: z.string().optional(),
+  mediaType: z.string().optional(),
+  isRemotion: z.boolean().optional(),
+  selectedModel: z.string().optional(),
+  audioType: z.string().optional(),
+  audioPrompt: z.string().optional(),
+  watermark: z.boolean().optional(),
+  isFeatured: z.boolean().optional(),
+  selectedMedia: z.object({
+    images: z.array(z.string()),
+    videos: z.array(z.string()),
+  }).optional(),
+  tiktokDescription: z.string().optional(),
+  youtubeDescription: z.string().optional(),
 });
 
 type UpdateProjectRequest = z.infer<typeof UpdateProjectSchema>;

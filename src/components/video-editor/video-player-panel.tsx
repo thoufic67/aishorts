@@ -52,6 +52,23 @@ export function VideoPlayerPanel({
 }: VideoPlayerPanelProps) {
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Cleanup function to prevent destroy errors
+  useEffect(() => {
+    return () => {
+      if (playerRef.current) {
+        try {
+          // Properly cleanup the player reference
+          if (typeof playerRef.current.pause === 'function') {
+            playerRef.current.pause();
+          }
+          playerRef.current = null;
+        } catch (error) {
+          console.warn("Error during player cleanup:", error);
+        }
+      }
+    };
+  }, []);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
@@ -154,27 +171,47 @@ export function VideoPlayerPanel({
 
   // Sync the Remotion player with our play/pause state
   useEffect(() => {
-    if (playerRef.current) {
+    if (playerRef.current && typeof playerRef.current.play === 'function') {
       if (effectiveIsPlaying) {
-        playerRef.current.play();
+        try {
+          playerRef.current.play();
+        } catch (error) {
+          console.warn("Failed to play Remotion player:", error);
+        }
       } else {
-        playerRef.current.pause();
+        try {
+          playerRef.current.pause();
+        } catch (error) {
+          console.warn("Failed to pause Remotion player:", error);
+        }
       }
     }
   }, [effectiveIsPlaying]);
 
-  // Update Remotion player time when currentTime changes
+  // Update Remotion player time when currentTime changes (debounced)
   useEffect(() => {
-    if (playerRef.current) {
-      const targetFrame = Math.round(effectiveCurrentTime * fps);
-      playerRef.current.seekTo(targetFrame);
+    if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
+      const timeoutId = setTimeout(() => {
+        try {
+          const targetFrame = Math.round(effectiveCurrentTime * fps);
+          playerRef.current.seekTo(targetFrame);
+        } catch (error) {
+          console.warn("Failed to seek Remotion player:", error);
+        }
+      }, 50); // Debounce seeks by 50ms
+
+      return () => clearTimeout(timeoutId);
     }
   }, [effectiveCurrentTime, fps]);
 
   // Mute Remotion player since audio is handled externally
   useEffect(() => {
-    if (playerRef.current) {
-      playerRef.current.setVolume(0); // Always mute Remotion player
+    if (playerRef.current && typeof playerRef.current.setVolume === 'function') {
+      try {
+        playerRef.current.setVolume(0); // Always mute Remotion player
+      } catch (error) {
+        console.warn("Failed to set volume on Remotion player:", error);
+      }
     }
   }, []);
 
@@ -189,9 +226,9 @@ export function VideoPlayerPanel({
     if (!effectiveIsPlaying) return;
 
     const interval = setInterval(() => {
-      if (playerRef.current) {
+      if (playerRef.current && typeof playerRef.current.getCurrentFrame === 'function') {
         try {
-          const frame = playerRef.current.getCurrentFrame?.() || 0;
+          const frame = playerRef.current.getCurrentFrame() || 0;
           const newTime = frame / fps;
           if (newTime <= effectiveTotalDuration) {
             effectiveOnTimeUpdate(newTime);
@@ -208,7 +245,7 @@ export function VideoPlayerPanel({
     }, 1000 / 30); // Update at 30fps
 
     return () => clearInterval(interval);
-  }, [effectiveIsPlaying, fps, effectiveTotalDuration, effectiveOnTimeUpdate, effectiveOnPlayPause]);
+  }, [effectiveIsPlaying, fps, effectiveTotalDuration]); // Remove function dependencies to prevent infinite loop
 
   const toggleFullscreen = () => {
     const doc = document as any;

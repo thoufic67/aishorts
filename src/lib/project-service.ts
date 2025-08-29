@@ -3,12 +3,21 @@ import {
   projects, 
   projectSegments, 
   projectFiles,
+  projectLayers,
+  projectTracks,
+  overlayAssets,
   type Project,
   type NewProject,
   type ProjectSegment,
   type NewProjectSegment,
   type ProjectFile,
-  type NewProjectFile
+  type NewProjectFile,
+  type ProjectLayer,
+  type NewProjectLayer,
+  type ProjectTrack,
+  type NewProjectTrack,
+  type OverlayAsset,
+  type NewOverlayAsset
 } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { R2Storage } from './r2-storage';
@@ -108,15 +117,31 @@ export class ProjectService {
 
       const segments = await this.getProjectSegments(projectId, userId);
       const files = await this.getProjectFiles(projectId, userId);
+      const layers = await this.getProjectLayers(projectId, userId);
+      const tracks = await this.getProjectTracks(projectId, userId);
 
-      // Associate files with their respective segments
-      const segmentsWithFiles = segments.map(segment => {
+      // Associate files with their respective segments and populate imageUrl/audioUrl
+      const segmentsWithFiles = await Promise.all(segments.map(async segment => {
         const segmentFiles = files.filter(file => file.segmentId === segment.id);
+        
+        // Get overlay asset if referenced
+        let overlay = null;
+        if (segment.overlayId) {
+          overlay = await this.getOverlayAsset(segment.overlayId);
+        }
+
+        // Find image and audio URLs from files or direct URLs
+        const imageFile = segmentFiles.find(f => f.fileType === 'image');
+        const audioFile = segmentFiles.find(f => f.fileType === 'audio');
+        
         return {
           ...segment,
           files: segmentFiles,
+          imageUrl: segment.imageUrl || imageFile?.r2Url || "",
+          audioUrl: segment.audioUrl || audioFile?.r2Url || "",
+          overlay,
         };
-      });
+      }));
 
       // Files not associated with any segment (project-level files)
       const projectFiles = files.filter(file => !file.segmentId);
@@ -124,7 +149,9 @@ export class ProjectService {
       return {
         ...project,
         segments: segmentsWithFiles,
-        files: projectFiles, // Only project-level files here
+        files: projectFiles,
+        layers,
+        tracks,
       };
     } catch (error) {
       console.error('Error getting project with details:', error);
@@ -544,6 +571,154 @@ export class ProjectService {
     } catch (error) {
       console.error('Error getting project stats:', error);
       throw new Error('Failed to get project statistics');
+    }
+  }
+
+  // ============= LAYER OPERATIONS =============
+
+  /**
+   * Get all layers for a project
+   */
+  static async getProjectLayers(projectId: string, userId: string): Promise<ProjectLayer[]> {
+    try {
+      // Verify project ownership
+      const project = await this.getProject(projectId, userId);
+      if (!project) {
+        throw new Error('Project not found or access denied');
+      }
+
+      const layers = await db
+        .select()
+        .from(projectLayers)
+        .where(eq(projectLayers.projectId, projectId))
+        .orderBy(projectLayers.order);
+
+      return layers;
+    } catch (error) {
+      console.error('Error getting project layers:', error);
+      throw new Error('Failed to get project layers');
+    }
+  }
+
+  /**
+   * Create default layers for a project if none exist
+   */
+  static async createDefaultLayers(projectId: string, userId: string): Promise<ProjectLayer[]> {
+    try {
+      // Verify project ownership
+      const project = await this.getProject(projectId, userId);
+      if (!project) {
+        throw new Error('Project not found or access denied');
+      }
+
+      // Check if layers already exist
+      const existingLayers = await this.getProjectLayers(projectId, userId);
+      if (existingLayers.length > 0) {
+        return existingLayers;
+      }
+
+      // Create default captions layer
+      const captionsLayer = await db.insert(projectLayers).values({
+        projectId,
+        type: 'captions',
+        captionStyle: {
+          fontSize: 75,
+          fontFamily: 'Inter',
+          activeWordColor: '#FFFFFF',
+          inactiveWordColor: '#CCCCCC',
+          backgroundColor: 'transparent',
+          fontWeight: '700',
+          textTransform: 'none',
+          textShadow: '.1em .1em .1em #000,.1em -.1em .1em #000,-.1em .1em .1em #000,-.1em -.1em .1em #000,.1em .1em .2em #000,.1em -.1em .2em #000,-.1em .1em .2em #000,-.1em -.1em .2em #000,0 0 .1em #000,0 0 .2em #000,0 0 .3em #000,0 0 .4em #000,0 0 .5em #000,0 0 .6em #000',
+          wordAnimation: ['none'],
+          showEmojis: true,
+          fromBottom: 49,
+          wordsPerBatch: 3,
+        },
+        volume: 0.2,
+        order: 0,
+      }).returning();
+
+      return captionsLayer;
+    } catch (error) {
+      console.error('Error creating default layers:', error);
+      throw new Error('Failed to create default layers');
+    }
+  }
+
+  // ============= TRACK OPERATIONS =============
+
+  /**
+   * Get all tracks for a project
+   */
+  static async getProjectTracks(projectId: string, userId: string): Promise<ProjectTrack[]> {
+    try {
+      // Verify project ownership
+      const project = await this.getProject(projectId, userId);
+      if (!project) {
+        throw new Error('Project not found or access denied');
+      }
+
+      const tracks = await db
+        .select()
+        .from(projectTracks)
+        .where(eq(projectTracks.projectId, projectId))
+        .orderBy(projectTracks.order);
+
+      return tracks;
+    } catch (error) {
+      console.error('Error getting project tracks:', error);
+      throw new Error('Failed to get project tracks');
+    }
+  }
+
+  // ============= OVERLAY ASSET OPERATIONS =============
+
+  /**
+   * Get overlay asset by ID
+   */
+  static async getOverlayAsset(assetId: string): Promise<OverlayAsset | null> {
+    try {
+      const [asset] = await db
+        .select()
+        .from(overlayAssets)
+        .where(eq(overlayAssets.id, assetId));
+
+      return asset || null;
+    } catch (error) {
+      console.error('Error getting overlay asset:', error);
+      throw new Error('Failed to get overlay asset');
+    }
+  }
+
+  /**
+   * Get all public overlay assets
+   */
+  static async getPublicOverlayAssets(): Promise<OverlayAsset[]> {
+    try {
+      const assets = await db
+        .select()
+        .from(overlayAssets)
+        .where(eq(overlayAssets.isPublic, true))
+        .orderBy(desc(overlayAssets.createdAt));
+
+      return assets;
+    } catch (error) {
+      console.error('Error getting public overlay assets:', error);
+      throw new Error('Failed to get public overlay assets');
+    }
+  }
+
+  /**
+   * Create overlay asset
+   */
+  static async createOverlayAsset(data: NewOverlayAsset): Promise<OverlayAsset> {
+    try {
+      const [asset] = await db.insert(overlayAssets).values(data).returning();
+      return asset;
+    } catch (error) {
+      console.error('Error creating overlay asset:', error);
+      throw new Error('Failed to create overlay asset');
     }
   }
 }

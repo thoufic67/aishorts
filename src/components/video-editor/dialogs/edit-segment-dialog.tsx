@@ -70,10 +70,6 @@ export function EditSegmentDialog({
       setImageModel("flux-schnell");
       setVoice("echo");
     }
-    if (!segment) {
-      console.log("EditSegmentDialog: No segment provided, returning null");
-      return null;
-    }
   }, [segment]);
 
   const handleRegenerateImage = () => {
@@ -115,7 +111,7 @@ export function EditSegmentDialog({
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
       <div className="mt-4 space-y-4">
-        {activeTab === "image" && (
+        {activeTab === "image" && segment && (
           <ImageEditTab
             segment={segment}
             imagePrompt={imagePrompt}
@@ -127,7 +123,7 @@ export function EditSegmentDialog({
           />
         )}
 
-        {activeTab === "script" && (
+        {activeTab === "script" && segment && (
           <ScriptEditTab
             segment={segment}
             script={script}

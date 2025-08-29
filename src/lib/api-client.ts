@@ -5,6 +5,7 @@
 
 import {
   Project,
+  ProjectWithDetails,
   ProjectSegment,
   ProjectFile,
   CreateProjectData,
@@ -257,8 +258,8 @@ export class ApiClient {
   /**
    * Get a specific project by ID with segments and files
    */
-  static async getProject(projectId: string): Promise<Project> {
-    return this.request<Project>(`/api/projects/${projectId}?include=details`);
+  static async getProject(projectId: string): Promise<ProjectWithDetails> {
+    return this.request<ProjectWithDetails>(`/api/projects/${projectId}?include=details`);
   }
 
   /**

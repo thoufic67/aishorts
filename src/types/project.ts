@@ -13,6 +13,19 @@ export interface Project {
   status: 'draft' | 'script-ready' | 'generating' | 'completed' | 'failed';
   format?: { width: number; height: number };
   settings?: any;
+  // Video generation specific fields
+  voice?: string;
+  type?: string;
+  mediaType?: string;
+  isRemotion?: boolean;
+  selectedModel?: string;
+  audioType?: string;
+  audioPrompt?: string;
+  watermark?: boolean;
+  isFeatured?: boolean;
+  selectedMedia?: { images: string[]; videos: string[] };
+  tiktokDescription?: string;
+  youtubeDescription?: string;
   createdAt: string;
   updatedAt: string;
   segments?: ProjectSegment[];
@@ -32,6 +45,14 @@ export interface ProjectSegment {
   withBlur: boolean;
   backgroundMinimized: boolean;
   wordTimings?: any;
+  // Direct URL references for easier access
+  imageUrl?: string;
+  audioUrl?: string;
+  // Additional segment properties
+  media?: any[];
+  elements?: any[];
+  overlayId?: string;
+  overlay?: OverlayAsset;
   createdAt: string;
   updatedAt: string;
   files?: ProjectFile[];
@@ -54,6 +75,71 @@ export interface ProjectFile {
   metadata?: any;
   createdAt: string;
   expiresAt?: string;
+}
+
+// New interfaces for layers, tracks, and overlay assets
+export interface ProjectLayer {
+  id: string;
+  projectId: string;
+  type: string; // 'captions', 'backgroundAudio', 'combinedAudio'
+  captionStyle?: {
+    fontSize: number;
+    fontFamily: string;
+    activeWordColor: string;
+    inactiveWordColor: string;
+    backgroundColor: string;
+    fontWeight: string;
+    textTransform: string;
+    textShadow: string;
+    wordAnimation: string[];
+    showEmojis: boolean;
+    fromBottom: number;
+    wordsPerBatch: number;
+  };
+  volume?: number;
+  url?: string;
+  assetId?: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectTrack {
+  id: string;
+  projectId: string;
+  name: string;
+  type: string; // 'audio', 'video', 'overlay'
+  settings?: any;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OverlayAsset {
+  id: string;
+  name: string;
+  description?: string;
+  author?: string;
+  url: string;
+  preview?: string;
+  type: string;
+  isPublic: boolean;
+  promptId?: string;
+  images?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Explicit interface for API response with populated relations
+export interface ProjectSegmentWithFiles extends ProjectSegment {
+  files: ProjectFile[];
+}
+
+export interface ProjectWithDetails extends Omit<Project, 'segments' | 'files'> {
+  segments: ProjectSegmentWithFiles[];
+  files: ProjectFile[];
+  layers: ProjectLayer[];
+  tracks: ProjectTrack[];
 }
 
 // API Request/Response types

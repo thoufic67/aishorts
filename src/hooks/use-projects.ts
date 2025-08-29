@@ -4,7 +4,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ProjectClient } from '@/lib/project-client';
-import { Project, CreateSegmentData, UpdateSegmentData } from '@/types/project';
+import { Project, ProjectWithDetails, CreateSegmentData, UpdateSegmentData } from '@/types/project';
 
 // Query keys
 export const projectQueryKeys = {
@@ -31,7 +31,7 @@ export function useProjects() {
  * Hook to get a specific project by ID
  */
 export function useProject(projectId: string | null) {
-  return useQuery({
+  return useQuery<ProjectWithDetails | null, Error>({
     queryKey: projectQueryKeys.detail(projectId || ''),
     queryFn: () => projectId ? ProjectClient.getProject(projectId) : null,
     enabled: !!projectId,
@@ -76,11 +76,17 @@ export function useUpdateProject() {
       ProjectClient.updateProject(projectId, data),
     onSuccess: (_, { projectId, data }) => {
       // Update the project in detail cache
-      queryClient.setQueryData<Project | null>(
+      queryClient.setQueryData<ProjectWithDetails | null>(
         projectQueryKeys.detail(projectId),
         (old) => {
           if (!old) return null;
-          return { ...old, ...data, updatedAt: new Date().toISOString() };
+          return { 
+            ...old, 
+            ...data, 
+            updatedAt: new Date().toISOString(),
+            segments: old.segments || [],
+            files: old.files || []
+          };
         }
       );
       
@@ -155,11 +161,11 @@ export function useCreateSegment() {
       ProjectClient.createSegment(projectId, data),
     onSuccess: (newSegment, { projectId }) => {
       // Update the project cache to include the new segment
-      queryClient.setQueryData<Project | null>(
+      queryClient.setQueryData<ProjectWithDetails | null>(
         projectQueryKeys.detail(projectId),
         (old) => {
           if (!old) return null;
-          const segments = [...(old.segments || []), newSegment];
+          const segments = [...(old.segments || []), { ...newSegment, files: [] }];
           return { ...old, segments };
         }
       );
@@ -185,7 +191,7 @@ export function useUpdateSegment() {
     }) => ProjectClient.updateSegment(projectId, segmentId, data),
     onSuccess: (updatedSegment, { projectId, segmentId }) => {
       // Update the project cache
-      queryClient.setQueryData<Project | null>(
+      queryClient.setQueryData<ProjectWithDetails | null>(
         projectQueryKeys.detail(projectId),
         (old) => {
           if (!old) return null;

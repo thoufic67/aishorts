@@ -6,6 +6,7 @@
 import { ApiClient } from './api-client';
 import {
   Project,
+  ProjectWithDetails,
   ProjectSegment,
   ProjectFile,
   CreateProjectData,
@@ -30,7 +31,7 @@ export interface VideoSegmentData {
 export interface ProjectData extends LegacyProjectData {}
 
 interface ProjectClientCache {
-  projects: Map<string, Project>;
+  projects: Map<string, ProjectWithDetails>;
   lastFetch: number;
   cacheDuration: number; // 5 minutes
 }
@@ -63,13 +64,22 @@ export class ProjectClient {
     try {
       const project = await ApiClient.createProject(projectData);
       
+      // Convert to ProjectWithDetails format for cache
+      const projectWithDetails: ProjectWithDetails = {
+        ...project,
+        segments: [],
+        files: [],
+        layers: [],
+        tracks: []
+      };
+      
       // Update cache
-      this.cache.projects.set(project.id, project);
+      this.cache.projects.set(project.id, projectWithDetails);
       
       // Set as current project
       this.setCurrentProject(project.id);
       
-      return project;
+      return projectWithDetails;
     } catch (error) {
       console.error('Failed to create project:', error);
       
@@ -82,7 +92,7 @@ export class ProjectClient {
   /**
    * Get a project by ID
    */
-  static async getProject(projectId: string): Promise<Project | null> {
+  static async getProject(projectId: string): Promise<ProjectWithDetails | null> {
     try {
       // Check cache first
       const cached = this.cache.projects.get(projectId);
@@ -127,8 +137,15 @@ export class ProjectClient {
 
       const updatedProject = await ApiClient.updateProject(projectId, updateData);
       
-      // Update cache
-      this.cache.projects.set(projectId, updatedProject);
+      // Update cache - convert to ProjectWithDetails
+      const projectWithDetails: ProjectWithDetails = {
+        ...updatedProject,
+        segments: (updatedProject.segments || []).map(segment => ({ ...segment, files: [] })),
+        files: updatedProject.files || [],
+        layers: [],
+        tracks: []
+      };
+      this.cache.projects.set(projectId, projectWithDetails);
     } catch (error) {
       console.error('Failed to update project:', error);
       
@@ -176,10 +193,17 @@ export class ProjectClient {
 
       const projects = await ApiClient.getUserProjects();
       
-      // Update cache
+      // Update cache - convert Project to ProjectWithDetails
       this.cache.projects.clear();
       projects.forEach(project => {
-        this.cache.projects.set(project.id, project);
+        const projectWithDetails: ProjectWithDetails = {
+          ...project,
+          segments: (project.segments || []).map(segment => ({ ...segment, files: [] })),
+          files: project.files || [],
+          layers: [],
+          tracks: []
+        };
+        this.cache.projects.set(project.id, projectWithDetails);
       });
       this.cache.lastFetch = Date.now();
       
@@ -481,7 +505,7 @@ export class ProjectClient {
 
   // ============= OFFLINE FALLBACK METHODS =============
 
-  private static createProjectOffline(idea: string, title?: string): Project {
+  private static createProjectOffline(idea: string, title?: string): ProjectWithDetails {
     if (typeof window === 'undefined') {
       throw new Error('Cannot create offline project on server');
     }
@@ -510,16 +534,32 @@ export class ProjectClient {
     projects[projectId] = legacyProject;
     localStorage.setItem('ai_video_projects', JSON.stringify(projects));
 
-    return migrateLegacyProject(legacyProject) as Project;
+    const migratedProject = migrateLegacyProject(legacyProject) as Project;
+    return {
+      ...migratedProject,
+      segments: (migratedProject.segments || []).map(segment => ({ ...segment, files: [] })),
+      files: [],
+      layers: [],
+      tracks: []
+    } as ProjectWithDetails;
   }
 
-  private static getProjectOffline(projectId: string): Project | null {
+  private static getProjectOffline(projectId: string): ProjectWithDetails | null {
     if (typeof window === 'undefined') return null;
 
     const projects = this.getAllOfflineProjects();
     const legacyProject = projects[projectId];
     
-    return legacyProject ? migrateLegacyProject(legacyProject) as Project : null;
+    if (!legacyProject) return null;
+    
+    const migratedProject = migrateLegacyProject(legacyProject) as Project;
+    return {
+      ...migratedProject,
+      segments: (migratedProject.segments || []).map(segment => ({ ...segment, files: [] })),
+      files: [],
+      layers: [],
+      tracks: []
+    } as ProjectWithDetails;
   }
 
   private static updateProjectOffline(projectId: string, data: Partial<Project>): void {

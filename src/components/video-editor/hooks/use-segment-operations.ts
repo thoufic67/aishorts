@@ -46,9 +46,17 @@ export function useSegmentOperations({
   }, [editingState]);
 
   const handleEdit = (index: number, segment: VideoSegment) => {
-    console.log("useSegmentOperations: handleEdit called with index:", index, "segment:", segment.text.substring(0, 50) + "...");
-    console.log("useSegmentOperations: Current editingState before update:", editingState);
-    
+    console.log(
+      "useSegmentOperations: handleEdit called with index:",
+      index,
+      "segment:",
+      segment.text.substring(0, 50) + "...",
+    );
+    console.log(
+      "useSegmentOperations: Current editingState before update:",
+      editingState,
+    );
+
     const newEditingState = {
       index,
       mode: "image" as EditMode,
@@ -57,8 +65,11 @@ export function useSegmentOperations({
       script: segment.text,
       voice: "echo",
     };
-    
-    console.log("useSegmentOperations: Setting new editingState:", newEditingState);
+
+    console.log(
+      "useSegmentOperations: Setting new editingState:",
+      newEditingState,
+    );
     setEditingState(newEditingState);
   };
 
@@ -83,7 +94,6 @@ export function useSegmentOperations({
           imageUrl: result.imageUrl,
         };
         onSegmentUpdate(index, updatedSegment);
-
       } else {
         // eslint-disable-next-line no-console
         console.error("Failed to regenerate image:", result.error);
@@ -238,7 +248,6 @@ export function useSegmentOperations({
         throw new Error("Failed to generate image: " + imageResult.error);
       }
 
-
       // Step 3: Generate audio
       const audioResponse = await fetch("/api/text-to-speech", {
         method: "POST",
@@ -302,7 +311,9 @@ export function useSegmentOperations({
   };
 
   const closeEditDialog = () => {
-    console.log("useSegmentOperations: closeEditDialog called - clearing editingState");
+    console.log(
+      "useSegmentOperations: closeEditDialog called - clearing editingState",
+    );
     setEditingState(null);
   };
 
