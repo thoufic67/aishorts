@@ -73,7 +73,9 @@ const SegmentComponent: React.FC<SegmentComponentProps> = ({
         {segment.imageUrl && (
           <MediaElement src={segment.imageUrl} scaleEffect={scaleEffect} />
         )}
-        <Audio src={segment.audioUrl} volume={segment.audioVolume} />
+        {segment.audioUrl && (
+          <Audio src={segment.audioUrl} volume={segment.audioVolume} />
+        )}
 
         {/* Media from files array if no imageUrl */}
         {!segment.imageUrl && segment.files && segment.files.length > 0 && (
