@@ -11,9 +11,9 @@ export function testCaptionTiming() {
     console.log(`\n--- Segment ${segmentIndex} ---`);
     console.log(`Text: "${segment.text}"`);
     console.log(`Duration: ${segment.duration}s`);
-    console.log(`Word Timings Count: ${segment.wordTimings.length}`);
+    console.log(`Word Timings Count: ${segment.wordTimings?.length || 0}`);
     
-    if (segment.wordTimings.length > 0) {
+    if (segment.wordTimings && segment.wordTimings.length > 0) {
       console.log("Word timing details:");
       
       segment.wordTimings.forEach((timing, timingIndex) => {
@@ -25,7 +25,7 @@ export function testCaptionTiming() {
       });
       
       // Verify timing continuity
-      const allWords = segment.wordTimings.flatMap(t => t.words);
+      const allWords = (segment.wordTimings || []).flatMap(t => t.words);
       const sortedWords = allWords.sort((a, b) => a.start - b.start);
       
       let hasGaps = false;
@@ -64,9 +64,9 @@ export function testCaptionTiming() {
 
 // Function to get word at specific time in a segment
 export function getWordAtTime(segment: VideoSegment, timeInSegment: number) {
-  if (!segment.wordTimings.length) return null;
+  if (!segment.wordTimings || !segment.wordTimings.length) return null;
   
-  const allWords = segment.wordTimings.flatMap(t => t.words);
+  const allWords = (segment.wordTimings || []).flatMap(t => t.words);
   const sortedWords = allWords.sort((a, b) => a.start - b.start);
   
   return sortedWords.find(word => 
@@ -76,9 +76,9 @@ export function getWordAtTime(segment: VideoSegment, timeInSegment: number) {
 
 // Function to get all active words at specific time
 export function getActiveWordsAtTime(segment: VideoSegment, timeInSegment: number) {
-  if (!segment.wordTimings.length) return [];
+  if (!segment.wordTimings || !segment.wordTimings.length) return [];
   
-  const allWords = segment.wordTimings.flatMap(t => t.words);
+  const allWords = (segment.wordTimings || []).flatMap(t => t.words);
   
   return allWords.filter(word => 
     timeInSegment >= word.start && timeInSegment <= word.end

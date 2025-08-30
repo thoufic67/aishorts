@@ -5,7 +5,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useProject, useUpdateSegment } from "./use-projects";
 import {
-  useProjectFiles,
   useUploadFile,
   useUploadBase64File,
 } from "./use-files";
@@ -23,19 +22,21 @@ export function useVideoEditor({
 }: UseVideoEditorProps): UseVideoEditorReturn {
   // Core hooks
   const { data: project, isLoading, error, refetch } = useProject(projectId);
-  const { data: projectFiles = [] } = useProjectFiles(projectId);
+  // Project files are now included in the project data when using ?include=details
+  // No need for separate projectFiles query since API returns nested files
   const updateSegmentMutation = useUpdateSegment();
   const uploadFile = useUploadFile();
   const uploadBase64File = useUploadBase64File();
 
   // Convert project to video format whenever data meaningfully changes
   const video = useMemo(() => {
-    console.log("useVideoEditor: project changed", project, projectFiles);
+    console.log("useVideoEditor: project changed", project);
     if (!project) {
       return null;
     }
     
-    return VideoProjectAdapter.projectToVideo(project, projectFiles);
+    // Pass empty array for projectFiles since files are nested in segments
+    return VideoProjectAdapter.projectToVideo(project, []);
   }, [
     // Only depend on values that meaningfully affect the conversion
     project?.id,
@@ -57,8 +58,8 @@ export function useVideoEditor({
       wordTimings: s.wordTimings,
       updatedAt: s.updatedAt
     }))),
-    // Serialize files to avoid reference issues
-    JSON.stringify(projectFiles.map(f => ({
+    // Files are now included in segments, so include them in dependency check
+    JSON.stringify(project?.segments?.flatMap(s => s.files || []).map(f => ({
       id: f.id,
       segmentId: f.segmentId,
       fileType: f.fileType,

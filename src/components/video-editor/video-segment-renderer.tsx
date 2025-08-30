@@ -6,6 +6,7 @@ import {
   Sequence,
   interpolate,
   useCurrentFrame,
+  Audio,
 } from "remotion";
 import type { VideoSegment } from "@/types/video";
 
@@ -27,7 +28,7 @@ export const VideoSegmentRenderer: React.FC<VideoSegmentRendererProps> = ({
     <>
       {segmentsToRender.map(({ segment, originalIndex }) => (
         <SegmentComponent
-          key={segment._id}
+          key={segment.id || segment._id}
           segment={segment}
           originalIndex={originalIndex}
           fps={fps}
@@ -72,18 +73,18 @@ const SegmentComponent: React.FC<SegmentComponentProps> = ({
         {segment.imageUrl && (
           <MediaElement src={segment.imageUrl} scaleEffect={scaleEffect} />
         )}
+        <Audio src={segment.audioUrl} volume={segment.audioVolume} />
 
-        {/* Media from media array if no imageUrl */}
-        {!segment.imageUrl && segment.media && segment.media.length > 0 && (
-          <Video
-            src={segment.media[0].url}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              transform: `scale(${scaleEffect})`,
-            }}
-            muted
+        {/* Media from files array if no imageUrl */}
+        {!segment.imageUrl && segment.files && segment.files.length > 0 && (
+          <MediaElement
+            src={
+              segment.files.find(
+                (file) =>
+                  file.fileType === "image" || file.fileType === "video",
+              )?.r2Url || ""
+            }
+            scaleEffect={scaleEffect}
           />
         )}
 
@@ -107,9 +108,11 @@ const SegmentComponent: React.FC<SegmentComponentProps> = ({
 
         {/* Fallback gradient background if no media */}
         {!segment.imageUrl &&
-          (!segment.media || segment.media.length === 0) && (
-            <FallbackBackground />
-          )}
+          (!segment.files ||
+            segment.files.length === 0 ||
+            !segment.files.find(
+              (file) => file.fileType === "image" || file.fileType === "video",
+            )) && <FallbackBackground />}
       </AbsoluteFill>
     </Sequence>
   );

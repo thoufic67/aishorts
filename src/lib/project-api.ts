@@ -1,6 +1,9 @@
 /**
  * Client-side API utilities for project management
+ * This is a legacy wrapper around ApiClient for backward compatibility
  */
+
+import { ApiClient } from './api-client';
 
 export interface CreateProjectData {
   title: string;
@@ -52,174 +55,91 @@ export class ProjectAPI {
    * Create a new project
    */
   static async createProject(data: CreateProjectData) {
-    const response = await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create project');
-    }
-
-    return response.json();
+    const project = await ApiClient.createProject(data);
+    return { data: project, success: true };
   }
 
   /**
    * Get project by ID
    */
   static async getProject(projectId: string, includeDetails = false) {
-    const url = includeDetails 
-      ? `/api/projects/${projectId}?include=details`
-      : `/api/projects/${projectId}`;
-      
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch project');
-    }
-
-    return response.json();
+    const project = await ApiClient.getProject(projectId);
+    return { data: project, success: true };
   }
 
   /**
    * Update project
    */
   static async updateProject(projectId: string, data: UpdateProjectData) {
-    const response = await fetch(`/api/projects/${projectId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update project');
-    }
-
-    return response.json();
+    const project = await ApiClient.updateProject(projectId, data);
+    return { data: project, success: true };
   }
 
   /**
    * Delete project
    */
   static async deleteProject(projectId: string) {
-    const response = await fetch(`/api/projects/${projectId}`, {
-      method: 'DELETE',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to delete project');
-    }
-
-    return response.json();
+    await ApiClient.deleteProject(projectId);
+    return { success: true };
   }
 
   /**
    * Get all projects for the current user
    */
   static async getUserProjects() {
-    const response = await fetch('/api/projects');
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch projects');
-    }
-
-    return response.json();
+    const projects = await ApiClient.getUserProjects();
+    return { data: projects, success: true };
   }
 
   /**
    * Create multiple segments at once
    */
   static async createSegmentsBatch(projectId: string, segments: CreateSegmentData[]) {
-    const response = await fetch(`/api/projects/${projectId}/segments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ segments }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create segments');
-    }
-
-    return response.json();
+    // Since ApiClient doesn't have batch create, create them individually
+    const results = await Promise.all(
+      segments.map(segment => ApiClient.createSegment(projectId, segment))
+    );
+    return { data: results, success: true };
   }
 
   /**
    * Create a single segment
    */
   static async createSegment(projectId: string, segment: CreateSegmentData) {
-    const response = await fetch(`/api/projects/${projectId}/segments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(segment),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create segment');
-    }
-
-    return response.json();
+    const result = await ApiClient.createSegment(projectId, segment);
+    return { data: result, success: true };
   }
 
   /**
    * Update segment
    */
   static async updateSegment(projectId: string, segmentId: string, data: Partial<CreateSegmentData>) {
-    const response = await fetch(`/api/projects/${projectId}/segments/${segmentId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update segment');
-    }
-
-    return response.json();
+    const result = await ApiClient.updateSegment(projectId, segmentId, data);
+    return { data: result, success: true };
   }
 
   /**
    * Get segments for a project
    */
   static async getProjectSegments(projectId: string) {
-    const response = await fetch(`/api/projects/${projectId}/segments`);
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch segments');
-    }
-
-    return response.json();
+    const segments = await ApiClient.getProjectSegments(projectId);
+    return { data: segments, success: true };
   }
 
   /**
    * Delete segment
    */
   static async deleteSegment(projectId: string, segmentId: string) {
-    const response = await fetch(`/api/projects/${projectId}/segments/${segmentId}`, {
-      method: 'DELETE',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to delete segment');
-    }
-
-    return response.json();
+    await ApiClient.deleteSegment(projectId, segmentId);
+    return { success: true };
   }
 
   /**
-   * Upload file to project
+   * Upload file to project via URL (legacy method for external URLs)
    */
   static async uploadFile(data: CreateFileData) {
+    // This is a legacy method that uploads files by downloading from URLs
+    // For modern file uploads, use ApiClient.uploadFile or ApiClient.uploadBase64File directly
     const response = await fetch('/api/files', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -238,35 +158,16 @@ export class ProjectAPI {
    * Get files for a project
    */
   static async getProjectFiles(projectId: string, fileType?: string) {
-    const url = new URL('/api/files', window.location.origin);
-    url.searchParams.set('projectId', projectId);
-    if (fileType) {
-      url.searchParams.set('fileType', fileType);
-    }
-
-    const response = await fetch(url.toString());
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch files');
-    }
-
-    return response.json();
+    const files = await ApiClient.getProjectFiles(projectId);
+    const filteredFiles = fileType ? files.filter(f => f.fileType === fileType) : files;
+    return { data: filteredFiles, success: true };
   }
 
   /**
    * Delete file
    */
   static async deleteFile(fileId: string) {
-    const response = await fetch(`/api/files/${fileId}`, {
-      method: 'DELETE',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to delete file');
-    }
-
-    return response.json();
+    await ApiClient.deleteFile(fileId);
+    return { success: true };
   }
 }

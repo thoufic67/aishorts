@@ -27,7 +27,7 @@ export function FrameCard({
   return (
     <Card
       className={`group cursor-pointer border transition-all ${
-        isHorizontal ? "relative w-20" : ""
+        isHorizontal ? "relative w-20 h-20" : "min-h-[300px]"
       } ${
         isSelected
           ? "border-blue-500 bg-blue-50"

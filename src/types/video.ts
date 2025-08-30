@@ -53,23 +53,42 @@ interface MediaItem {
   _id: string;
 }
 
+// Project File interface (for the files array in segments)
+interface ProjectFile {
+  id: string;
+  fileType: 'image' | 'video' | 'audio' | 'overlay';
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  r2Key: string;
+  r2Url: string;
+  uploadStatus: 'uploading' | 'completed' | 'failed';
+  metadata?: any;
+  createdAt: string;
+  expiresAt?: string;
+}
+
 // Segment interface
 interface VideoSegment {
+  // Either id or _id must be present for identification
+  id?: string; // New API response format
+  _id?: string; // Legacy format - keep for backward compatibility
   text: string;
   imagePrompt: string;
-  imageUrl: string;
-  audioUrl: string;
+  imageUrl?: string; // Made optional since it might come from files array
+  audioUrl?: string; // Made optional since it might come from files array
   audioVolume: number;
   playBackRate: number;
   duration: number;
   withBlur: boolean;
-  wordTimings: WordTiming[];
+  wordTimings?: WordTiming[]; // Made optional
   backgroundMinimized: boolean;
   order: number;
   overlay?: Overlay;
-  media: MediaItem[];
-  elements: any[];
-  _id: string;
+  media?: MediaItem[]; // Made optional for backward compatibility
+  elements?: any[]; // Made optional
+  files?: ProjectFile[]; // Added files array from API response
 }
 
 // Caption styling interface
@@ -175,6 +194,7 @@ export type {
   VideoGenerationData,
   Video,
   VideoSegment,
+  ProjectFile,
   Layer,
   CaptionStyle,
   Asset,

@@ -38,7 +38,10 @@ export class VideoProjectAdapter {
    * Convert a database Project to a Video editor compatible format
    */
   static projectToVideo(project: Project, projectFiles: ProjectFile[] = []): Video {
-    const segments = this.convertSegmentsWithFiles(project.segments || [], projectFiles);
+    // Use nested files from segments if available, otherwise fall back to separate projectFiles array
+    const segments = project.segments?.length && project.segments[0].files
+      ? this.convertSegmentsWithNestedFiles(project.segments || [])
+      : this.convertSegmentsWithFiles(project.segments || [], projectFiles);
     
     return {
       _id: project.id,
@@ -68,6 +71,36 @@ export class VideoProjectAdapter {
   }
 
   /**
+   * Convert project segments with nested files to video segments
+   */
+  static convertSegmentsWithNestedFiles(segments: ProjectSegment[]): VideoSegment[] {
+    return segments.map((segment) => {
+      // Files are nested within the segment
+      const segmentFiles = segment.files || [];
+      const imageFile = segmentFiles.find(file => file.fileType === 'image');
+      const audioFile = segmentFiles.find(file => file.fileType === 'audio');
+
+      return {
+        id: segment.id,
+        _id: segment.id, // Keep for backward compatibility
+        text: segment.text,
+        imagePrompt: segment.imagePrompt,
+        imageUrl: imageFile?.r2Url || imageFile?.tempUrl || segment.imageUrl || '',
+        audioUrl: audioFile?.r2Url || audioFile?.tempUrl || segment.audioUrl || '',
+        audioVolume: segment.audioVolume,
+        playBackRate: segment.playBackRate,
+        duration: Math.max(1, segment.duration || 5), // Default to 5 seconds minimum
+        withBlur: segment.withBlur,
+        backgroundMinimized: segment.backgroundMinimized,
+        order: segment.order,
+        wordTimings: segment.wordTimings ? [segment.wordTimings] : [],
+        media: [],
+        elements: [],
+      };
+    });
+  }
+
+  /**
    * Convert project segments with associated files to video segments
    */
   static convertSegmentsWithFiles(
@@ -81,7 +114,8 @@ export class VideoProjectAdapter {
       const audioFile = segmentFiles.find(file => file.fileType === 'audio');
 
       return {
-        _id: segment.id,
+        id: segment.id,
+        _id: segment.id, // Keep for backward compatibility
         text: segment.text,
         imagePrompt: segment.imagePrompt,
         imageUrl: imageFile?.r2Url || imageFile?.tempUrl || '',
@@ -143,9 +177,9 @@ export class VideoProjectAdapter {
         });
       }
 
-      if (segment.audioUrl && segment.audioUrl.startsWith('data:') || segment.audioUrl.startsWith('blob:')) {
+      if (segment.audioUrl && (segment.audioUrl.startsWith('data:') || segment.audioUrl.startsWith('blob:'))) {
         uploads.push({
-          segmentId: segment._id || '',
+          segmentId: segment._id || segment.id || '',
           type: 'audio', 
           url: segment.audioUrl,
           order: segment.order,

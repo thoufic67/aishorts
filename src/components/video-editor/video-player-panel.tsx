@@ -2,17 +2,22 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Player } from "@remotion/player";
-import { Play, Pause, Volume2, VolumeX, Maximize, Upload, RefreshCw } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Upload,
+  RefreshCw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoComposition } from "@/components/video-editor/video-composition";
-import { ExternalAudioPlayer } from "@/components/video-editor/external-audio-player";
 import { VideoFramesPanel } from "@/components/video-editor/video-frames-panel";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Loading } from "@/components/ui/loading";
-import { Badge } from "@/components/ui/badge";
 import type { Video, VideoSegment } from "@/types/video";
 import { useVideoEditor, useVideoPlayer } from "@/hooks/use-video-editor";
-import { ScrollArea } from "../ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -23,32 +28,16 @@ import { toast } from "sonner";
 
 interface VideoPlayerPanelProps {
   projectId: string;
-  // Legacy props for backward compatibility (optional)
-  video?: Video;
-  isPlaying?: boolean;
-  onPlayPause?: () => void;
-  currentTime?: number;
-  onTimeUpdate?: (time: number) => void;
-  totalDuration?: number;
-  selectedFrameIndex?: number;
-  onFrameSelect?: (index: number) => void;
-  onSegmentUpdate?: (index: number, updatedSegment: VideoSegment) => void;
-  onSegmentInsert?: (insertAfterIndex: number, newSegment: VideoSegment) => void;
+  // Optional handlers for segment operations
+  onSegmentInsert?: (
+    insertAfterIndex: number,
+    newSegment: VideoSegment,
+  ) => void;
 }
 
 export function VideoPlayerPanel({
   projectId,
-  // Legacy props (fallbacks)
-  video: legacyVideo,
-  isPlaying: legacyIsPlaying,
-  onPlayPause: legacyOnPlayPause,
-  currentTime: legacyCurrentTime,
-  onTimeUpdate: legacyOnTimeUpdate,
-  totalDuration: legacyTotalDuration,
-  selectedFrameIndex: legacySelectedFrameIndex,
-  onFrameSelect: legacyOnFrameSelect,
-  onSegmentUpdate: legacyOnSegmentUpdate,
-  onSegmentInsert: legacyOnSegmentInsert,
+  onSegmentInsert,
 }: VideoPlayerPanelProps) {
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -59,7 +48,7 @@ export function VideoPlayerPanel({
       if (playerRef.current) {
         try {
           // Properly cleanup the player reference
-          if (typeof playerRef.current.pause === 'function') {
+          if (typeof playerRef.current.pause === "function") {
             playerRef.current.pause();
           }
           playerRef.current = null;
@@ -96,22 +85,11 @@ export function VideoPlayerPanel({
     selectFrame,
   } = useVideoPlayer(video);
 
-  // Use legacy props as fallbacks if video editor hooks fail
-  const effectiveVideo = video || legacyVideo;
-  const effectiveIsPlaying = video ? isPlaying : (legacyIsPlaying ?? false);
-  const effectiveCurrentTime = video ? currentTime : (legacyCurrentTime ?? 0);
-  const effectiveTotalDuration = video ? totalDuration : (legacyTotalDuration ?? 0);
-  const effectiveSelectedFrameIndex = video ? selectedFrameIndex : (legacySelectedFrameIndex ?? 0);
-  
-  const effectiveOnPlayPause = video ? togglePlayPause : (legacyOnPlayPause ?? (() => {}));
-  const effectiveOnTimeUpdate = video ? updateCurrentTime : (legacyOnTimeUpdate ?? (() => {}));
-  const effectiveOnFrameSelect = video ? selectFrame : (legacyOnFrameSelect ?? (() => {}));
-
   // Show loading state
   if (isLoading) {
     return (
       <div className="flex h-full w-full flex-1 items-center justify-center">
-        <div className="text-center space-y-4">
+        <div className="space-y-4 text-center">
           <Loading size="lg" />
           <p className="text-foreground/70">Loading video project...</p>
         </div>
@@ -123,9 +101,9 @@ export function VideoPlayerPanel({
   if (error) {
     return (
       <div className="flex h-full w-full flex-1 items-center justify-center">
-        <div className="text-center space-y-4">
+        <div className="space-y-4 text-center">
           <p className="text-destructive">Failed to load video project</p>
-          <p className="text-foreground/70 text-sm">{error.message}</p>
+          <p className="text-sm text-foreground/70">{error.message}</p>
           <Button onClick={refreshVideo} variant="outline">
             <RefreshCw className="mr-2 h-4 w-4" />
             Retry
@@ -136,10 +114,10 @@ export function VideoPlayerPanel({
   }
 
   // Show empty state
-  if (!effectiveVideo) {
+  if (!video) {
     return (
       <div className="flex h-full w-full flex-1 items-center justify-center">
-        <div className="text-center space-y-4">
+        <div className="space-y-4 text-center">
           <p className="text-foreground/70">No video project found</p>
           <Button onClick={refreshVideo} variant="outline">
             <RefreshCw className="mr-2 h-4 w-4" />
@@ -152,14 +130,15 @@ export function VideoPlayerPanel({
 
   // Calculate frame number for display
   const fps = 30;
-  const totalFrames = Math.max(1, Math.floor(effectiveTotalDuration * fps)); // Ensure at least 1 frame
+  const totalFrames = Math.max(1, Math.floor(totalDuration * fps)); // Ensure at least 1 frame
 
   // Enhanced segment update handler
-  const handleSegmentUpdate = async (index: number, updatedSegment: VideoSegment) => {
+  const handleSegmentUpdate = async (
+    index: number,
+    updatedSegment: VideoSegment,
+  ) => {
     if (video && updateSegment) {
       await updateSegment(index, updatedSegment);
-    } else if (legacyOnSegmentUpdate) {
-      legacyOnSegmentUpdate(index, updatedSegment);
     }
   };
 
@@ -169,73 +148,24 @@ export function VideoPlayerPanel({
     setShowFileUpload(true);
   };
 
-  // Sync the Remotion player with our play/pause state
-  useEffect(() => {
-    if (playerRef.current && typeof playerRef.current.play === 'function') {
-      if (effectiveIsPlaying) {
-        try {
-          playerRef.current.play();
-        } catch (error) {
-          console.warn("Failed to play Remotion player:", error);
-        }
-      } else {
-        try {
-          playerRef.current.pause();
-        } catch (error) {
-          console.warn("Failed to pause Remotion player:", error);
-        }
-      }
-    }
-  }, [effectiveIsPlaying]);
-
-  // Update Remotion player time when currentTime changes (debounced)
-  useEffect(() => {
-    if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
-      const timeoutId = setTimeout(() => {
-        try {
-          const targetFrame = Math.round(effectiveCurrentTime * fps);
-          playerRef.current.seekTo(targetFrame);
-        } catch (error) {
-          console.warn("Failed to seek Remotion player:", error);
-        }
-      }, 50); // Debounce seeks by 50ms
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [effectiveCurrentTime, fps]);
-
-  // Mute Remotion player since audio is handled externally
-  useEffect(() => {
-    if (playerRef.current && typeof playerRef.current.setVolume === 'function') {
-      try {
-        playerRef.current.setVolume(0); // Always mute Remotion player
-      } catch (error) {
-        console.warn("Failed to set volume on Remotion player:", error);
-      }
-    }
-  }, []);
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
   // Create a timer to update currentTime when playing
   useEffect(() => {
-    if (!effectiveIsPlaying) return;
+    if (!isPlaying) return;
 
     const interval = setInterval(() => {
-      if (playerRef.current && typeof playerRef.current.getCurrentFrame === 'function') {
+      if (
+        playerRef.current &&
+        typeof playerRef.current.getCurrentFrame === "function"
+      ) {
         try {
           const frame = playerRef.current.getCurrentFrame() || 0;
           const newTime = frame / fps;
-          if (newTime <= effectiveTotalDuration) {
-            effectiveOnTimeUpdate(newTime);
+          if (newTime <= totalDuration) {
+            updateCurrentTime(newTime);
           } else {
             // Video ended - pause playback and reset time
-            effectiveOnPlayPause(); // This will set isPlaying to false, stopping all audio
-            effectiveOnTimeUpdate(0);
+            togglePlayPause(); // This will set isPlaying to false, stopping all audio
+            updateCurrentTime(0);
           }
         } catch (error) {
           // Handle any potential player errors
@@ -245,51 +175,19 @@ export function VideoPlayerPanel({
     }, 1000 / 30); // Update at 30fps
 
     return () => clearInterval(interval);
-  }, [effectiveIsPlaying, fps, effectiveTotalDuration]); // Remove function dependencies to prevent infinite loop
-
-  const toggleFullscreen = () => {
-    const doc = document as any;
-    const isCurrentlyFullscreen =
-      document.fullscreenElement != null || doc.webkitFullscreenElement != null;
-
-    if (isCurrentlyFullscreen) {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if (doc.webkitExitFullscreen) {
-        doc.webkitExitFullscreen();
-      }
-      return;
-    }
-
-    const el = containerRef.current as any;
-    if (!el) return;
-
-    try {
-      if (el.requestFullscreen) {
-        el.requestFullscreen();
-      } else if (el.webkitRequestFullscreen) {
-        el.webkitRequestFullscreen();
-      } else if (el.mozRequestFullScreen) {
-        el.mozRequestFullScreen();
-      } else if (el.msRequestFullscreen) {
-        el.msRequestFullscreen();
-      }
-    } catch (error) {
-      console.warn("Fullscreen request failed", error);
-    }
-  };
+  }, [isPlaying, fps, totalDuration, updateCurrentTime, togglePlayPause]);
 
   return (
     <div className="flex h-full w-full flex-1 flex-col">
       {/* External Audio Player - Handles all audio playback */}
-      <ExternalAudioPlayer
-        segments={effectiveVideo.segments}
-        isPlaying={effectiveIsPlaying}
-        currentTime={effectiveCurrentTime}
+      {/* <ExternalAudioPlayer
+        segments={video.segments}
+        isPlaying={isPlaying}
+        currentTime={currentTime}
         backgroundMusicUrl="/demo/temporex.mp3"
         volume={volume}
         isMuted={isMuted}
-      />
+      /> */}
 
       {/* Video Player Area */}
       <div className="mx-auto flex h-full flex-1 items-center justify-center p-4">
@@ -305,46 +203,36 @@ export function VideoPlayerPanel({
               ref={playerRef}
               component={VideoComposition}
               durationInFrames={totalFrames}
-              compositionWidth={effectiveVideo.format.width}
-              compositionHeight={effectiveVideo.format.height}
+              compositionWidth={video.format.width}
+              compositionHeight={video.format.height}
               fps={fps}
               style={{
                 width: "100%",
                 height: "100%",
               }}
               inputProps={{
-                video: effectiveVideo,
+                video: video,
               }}
               autoPlay={false}
-              controls={false}
+              controls={true}
               loop={false}
               allowFullscreen
               doubleClickToFullscreen
-              showVolumeControls={false}
+              showVolumeControls={true}
               spaceKeyToPlayOrPause={false}
             />
-
             {/* Play/Pause overlay */}
-            {!effectiveIsPlaying && (
+            {/* {!isPlaying && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Button
-                  onClick={effectiveOnPlayPause}
+                  onClick={togglePlayPause}
                   size="lg"
                   className="h-16 w-16 rounded-full bg-background/20 p-0 text-background shadow-lg backdrop-blur-sm hover:bg-background/30"
                 >
                   <Play className="ml-1 h-8 w-8" />
                 </Button>
               </div>
-            )}
-
-            {/* Database status indicator */}
-            {video && (
-              <div className="absolute top-2 left-2">
-                <Badge variant="secondary" className="text-xs">
-                  Database
-                </Badge>
-              </div>
-            )}
+            )} */}
           </div>
         </div>
       </div>
@@ -353,15 +241,15 @@ export function VideoPlayerPanel({
       <div className="mx-auto w-full p-4">
         <div className="mx-auto max-w-4xl space-y-4">
           {/* Playback Controls */}
-          <div className="flex items-center justify-between">
+          {/* <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
-                onClick={effectiveOnPlayPause}
+                onClick={togglePlayPause}
                 size="sm"
                 variant="ghost"
                 className="text-default hover:bg-default/20 h-10 w-10 rounded-full bg-white/10"
               >
-                {effectiveIsPlaying ? (
+                {isPlaying ? (
                   <Pause className="h-5 w-5" />
                 ) : (
                   <Play className="ml-0.5 h-5 w-5" />
@@ -397,10 +285,9 @@ export function VideoPlayerPanel({
               </div>
             </div>
 
-            {/* Time Display */}
             <div className="text-default/70 flex items-center gap-4 font-mono text-sm">
               <span>
-                {formatTime(effectiveCurrentTime)} / {formatTime(effectiveTotalDuration)}
+                {formatTime(currentTime)} / {formatTime(totalDuration)}
               </span>
               {currentSegmentInfo && (
                 <Badge variant="outline" className="text-xs">
@@ -417,31 +304,31 @@ export function VideoPlayerPanel({
             >
               <Maximize className="h-4 w-4" />
             </Button>
-          </div>
+          </div> */}
 
           {/* Progress Bar */}
-          <div className="relative">
+          {/* <div className="relative">
             <div className="bg-default/20 h-1 w-full rounded-full">
               <div
                 className="h-1 rounded-full bg-blue-500 transition-all duration-150"
-                style={{ width: `${(effectiveCurrentTime / effectiveTotalDuration) * 100}%` }}
+                style={{ width: `${(currentTime / totalDuration) * 100}%` }}
               />
             </div>
             <div
               className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-blue-500 shadow-md"
-              style={{ left: `${(effectiveCurrentTime / effectiveTotalDuration) * 100}%` }}
+              style={{ left: `${(currentTime / totalDuration) * 100}%` }}
             />
-          </div>
+          </div> */}
 
           {/* Horizontal Segment Panel */}
           <VideoFramesPanel
-            segments={effectiveVideo.segments}
-            selectedFrameIndex={effectiveSelectedFrameIndex}
-            onFrameSelect={effectiveOnFrameSelect}
-            currentTime={effectiveCurrentTime}
-            totalDuration={effectiveTotalDuration}
+            segments={video.segments}
+            selectedFrameIndex={selectedFrameIndex}
+            onFrameSelect={selectFrame}
+            currentTime={currentTime}
+            totalDuration={totalDuration}
             onSegmentUpdate={handleSegmentUpdate}
-            onSegmentInsert={legacyOnSegmentInsert}
+            onSegmentInsert={onSegmentInsert}
             orientation="horizontal"
             showHeader={false}
           />
