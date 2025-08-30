@@ -179,23 +179,13 @@ export function VideoPlayerPanel({
 
   return (
     <div className="flex h-full w-full flex-1 flex-col">
-      {/* External Audio Player - Handles all audio playback */}
-      {/* <ExternalAudioPlayer
-        segments={video.segments}
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        backgroundMusicUrl="/demo/temporex.mp3"
-        volume={volume}
-        isMuted={isMuted}
-      /> */}
-
       {/* Video Player Area */}
       <div className="mx-auto flex h-full flex-1 items-center justify-center p-4">
         <div className="relative mx-auto h-full">
           {/* Video Container */}
           <div
             ref={containerRef}
-            className="relative aspect-[9/16] h-full max-h-[70vh] overflow-hidden rounded-2xl bg-black shadow-2xl"
+            className="relative aspect-[9/16] h-full overflow-hidden rounded-2xl bg-black shadow-2xl"
           >
             {/* Remotion Player */}
             <Player
@@ -221,18 +211,6 @@ export function VideoPlayerPanel({
               showVolumeControls={true}
               spaceKeyToPlayOrPause={false}
             />
-            {/* Play/Pause overlay */}
-            {/* {!isPlaying && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Button
-                  onClick={togglePlayPause}
-                  size="lg"
-                  className="h-16 w-16 rounded-full bg-background/20 p-0 text-background shadow-lg backdrop-blur-sm hover:bg-background/30"
-                >
-                  <Play className="ml-1 h-8 w-8" />
-                </Button>
-              </div>
-            )} */}
           </div>
         </div>
       </div>
@@ -240,86 +218,6 @@ export function VideoPlayerPanel({
       {/* Bottom Controls and Segment Timeline */}
       <div className="mx-auto w-full p-4">
         <div className="mx-auto max-w-4xl space-y-4">
-          {/* Playback Controls */}
-          {/* <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={togglePlayPause}
-                size="sm"
-                variant="ghost"
-                className="text-default hover:bg-default/20 h-10 w-10 rounded-full bg-white/10"
-              >
-                {isPlaying ? (
-                  <Pause className="h-5 w-5" />
-                ) : (
-                  <Play className="ml-0.5 h-5 w-5" />
-                )}
-              </Button>
-
-              <div className="text-default/70 flex items-center gap-2 text-sm">
-                <Button
-                  onClick={() => setIsMuted(!isMuted)}
-                  variant="ghost"
-                  size="sm"
-                  className="text-default/70 hover:text-default"
-                >
-                  {isMuted ? (
-                    <VolumeX className="h-4 w-4" />
-                  ) : (
-                    <Volume2 className="h-4 w-4" />
-                  )}
-                </Button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={isMuted ? 0 : volume}
-                  onChange={(e) => {
-                    const newVolume = parseFloat(e.target.value);
-                    setVolume(newVolume);
-                    setIsMuted(newVolume === 0);
-                  }}
-                  className="w-20 accent-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="text-default/70 flex items-center gap-4 font-mono text-sm">
-              <span>
-                {formatTime(currentTime)} / {formatTime(totalDuration)}
-              </span>
-              {currentSegmentInfo && (
-                <Badge variant="outline" className="text-xs">
-                  Segment {currentSegmentInfo.index + 1}
-                </Badge>
-              )}
-            </div>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-default/70 hover:text-default"
-              onClick={toggleFullscreen}
-            >
-              <Maximize className="h-4 w-4" />
-            </Button>
-          </div> */}
-
-          {/* Progress Bar */}
-          {/* <div className="relative">
-            <div className="bg-default/20 h-1 w-full rounded-full">
-              <div
-                className="h-1 rounded-full bg-blue-500 transition-all duration-150"
-                style={{ width: `${(currentTime / totalDuration) * 100}%` }}
-              />
-            </div>
-            <div
-              className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-blue-500 shadow-md"
-              style={{ left: `${(currentTime / totalDuration) * 100}%` }}
-            />
-          </div> */}
-
           {/* Horizontal Segment Panel */}
           <VideoFramesPanel
             segments={video.segments}

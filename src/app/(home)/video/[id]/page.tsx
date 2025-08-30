@@ -399,7 +399,7 @@ export default function VideoEditorPage() {
           projectId={project.id}
           onSegmentInsert={handleSegmentInsert}
         />
-        <Player
+        {/* <Player
           className="h-80 w-full"
           component={VideoConfig.component}
           durationInFrames={VideoConfig.durationInFrames}
@@ -417,7 +417,7 @@ export default function VideoEditorPage() {
           doubleClickToFullscreen
           showVolumeControls={true}
           spaceKeyToPlayOrPause={false}
-        />
+        /> */}
       </div>
     </div>
   );
