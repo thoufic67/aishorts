@@ -12,6 +12,7 @@ interface VideoFramesPanelProps {
   onFrameSelect: (index: number) => void;
   currentTime: number;
   totalDuration: number;
+  projectId?: string;
   onSegmentUpdate?: (index: number, updatedSegment: VideoSegment) => void;
   onSegmentInsert?: (index: number, newSegment: VideoSegment) => void;
   orientation?: "vertical" | "horizontal";
@@ -24,6 +25,7 @@ export function VideoFramesPanel({
   onFrameSelect,
   currentTime: _currentTime,
   totalDuration: _totalDuration,
+  projectId,
   onSegmentUpdate,
   onSegmentInsert,
   orientation = "vertical",
@@ -42,6 +44,7 @@ export function VideoFramesPanel({
     closeNewFrameDialog,
   } = useSegmentOperations({
     segments,
+    projectId,
     onSegmentUpdate,
     onSegmentInsert,
   });

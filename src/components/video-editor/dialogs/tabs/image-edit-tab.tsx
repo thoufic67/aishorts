@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ImageModelSelector } from "../../forms";
 import { imageModels } from "@/lib/image-models";
 import type { VideoSegment } from "@/types/video";
+import { useEffect } from "react";
 
 interface ImageEditTabProps {
   segment: VideoSegment;
@@ -25,6 +26,11 @@ export function ImageEditTab({
   isRegenerating,
 }: ImageEditTabProps) {
   const hasChanges = imagePrompt !== segment.imagePrompt;
+
+  // Debug: Track when segment imageUrl changes
+  useEffect(() => {
+    console.log("ImageEditTab: segment imageUrl updated:", segment.imageUrl);
+  }, [segment.imageUrl]);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

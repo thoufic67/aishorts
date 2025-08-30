@@ -24,12 +24,14 @@ interface NewFrameState {
 
 interface UseSegmentOperationsProps {
   segments: VideoSegment[];
+  projectId?: string;
   onSegmentUpdate?: (index: number, updatedSegment: VideoSegment) => void;
   onSegmentInsert?: (index: number, newSegment: VideoSegment) => void;
 }
 
 export function useSegmentOperations({
   segments,
+  projectId,
   onSegmentUpdate,
   onSegmentInsert,
 }: UseSegmentOperationsProps) {
@@ -78,16 +80,60 @@ export function useSegmentOperations({
     newPrompt: string,
     model: string,
   ) => {
-    if (!onSegmentUpdate) return;
+    if (!onSegmentUpdate || !projectId) return;
 
     setIsRegenerating(index);
     try {
+      // Step 1: Generate the new image
       const result = await generateImage({
         prompt: newPrompt,
         model,
       });
 
       if (result.success && result.imageUrl) {
+        const segment = segments[index];
+        const segmentId = segment.id || segment._id;
+
+        if (segmentId) {
+          // Step 2: Create file record in database
+          try {
+            const fileResponse = await fetch("/api/files", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                projectId,
+                segmentId,
+                fileType: "image",
+                fileName: `image_${segmentId}_${Date.now()}.jpg`,
+                mimeType: "image/jpeg",
+                fileSize: 1024, // Size will be determined by the storage service
+                sourceUrl: result.imageUrl,
+                metadata: {
+                  prompt: newPrompt,
+                  model,
+                  generatedAt: new Date().toISOString(),
+                },
+              }),
+            });
+
+            if (!fileResponse.ok) {
+              const error = await fileResponse.json();
+              throw new Error(`Failed to create file record: ${error.error}`);
+            }
+
+            const fileData = await fileResponse.json();
+            console.log("File record created:", fileData);
+          } catch (fileError) {
+            console.warn(
+              "Failed to create file record, but continuing with segment update:",
+              fileError,
+            );
+          }
+        }
+
+        // Step 3: Update the segment
         const updatedSegment: VideoSegment = {
           ...segments[index],
           imagePrompt: newPrompt,
@@ -107,7 +153,7 @@ export function useSegmentOperations({
       alert("Error regenerating image. Please try again.");
     } finally {
       setIsRegenerating(null);
-      setEditingState(null);
+      // setEditingState(null);
     }
   };
 
@@ -116,10 +162,11 @@ export function useSegmentOperations({
     newScript: string,
     voice: string,
   ) => {
-    if (!onSegmentUpdate) return;
+    if (!onSegmentUpdate || !projectId) return;
 
     setIsRegenerating(index);
     try {
+      // Step 1: Generate the new audio
       const response = await fetch("/api/text-to-speech", {
         method: "POST",
         headers: {
@@ -148,6 +195,50 @@ export function useSegmentOperations({
           actualDuration = estimateAudioDuration(newScript);
         }
 
+        const segment = segments[index];
+        const segmentId = segment.id || segment._id;
+
+        if (segmentId) {
+          // Step 2: Create file record in database
+          try {
+            const fileResponse = await fetch("/api/files", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                projectId,
+                segmentId,
+                fileType: "audio",
+                fileName: `audio_${segmentId}_${Date.now()}.mp3`,
+                mimeType: "audio/mpeg",
+                fileSize: 0, // Size will be determined by the storage service
+                sourceUrl: audioUrl,
+                metadata: {
+                  text: newScript,
+                  voice,
+                  duration: actualDuration,
+                  generatedAt: new Date().toISOString(),
+                },
+              }),
+            });
+
+            if (!fileResponse.ok) {
+              const error = await fileResponse.json();
+              throw new Error(`Failed to create file record: ${error.error}`);
+            }
+
+            const fileData = await fileResponse.json();
+            console.log("File record created:", fileData);
+          } catch (fileError) {
+            console.warn(
+              "Failed to create file record, but continuing with segment update:",
+              fileError,
+            );
+          }
+        }
+
+        // Step 3: Update the segment
         const updatedSegment: VideoSegment = {
           ...segments[index],
           text: newScript,
@@ -165,7 +256,7 @@ export function useSegmentOperations({
       alert("Error regenerating audio. Please try again.");
     } finally {
       setIsRegenerating(null);
-      setEditingState(null);
+      // setEditingState(null);
     }
   };
 

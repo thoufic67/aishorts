@@ -63,7 +63,7 @@ async function generateImageWithService(
   segmentId?: string,
 ): Promise<ImageResult> {
   let result: ImageResult;
-  
+
   if (isOpenAIModel(model)) {
     // Use OpenAI service for DALL-E 3 and GPT-Image-1
     result = await OpenAIService.generateImage({
@@ -80,14 +80,9 @@ async function generateImageWithService(
   } else {
     // Use FalAI service for Flux models
     // Note: FalAI service doesn't yet support R2 storage
-    result = await FalAIService.generateImage(
-      prompt,
-      style,
-      imageSize,
-      model,
-    );
+    result = await FalAIService.generateImage(prompt, style, imageSize, model);
   }
-  
+
   return {
     ...result,
     prompt,
@@ -100,13 +95,15 @@ export async function POST(request: NextRequest) {
 
     // Get user session if R2 storage is requested
     let userId: string | undefined;
-    if ((body.type === "single" && body.storeInR2) || 
-        (body.type === "batch" && body.storeInR2)) {
+    if (
+      (body.type === "single" && body.storeInR2) ||
+      (body.type === "batch" && body.storeInR2)
+    ) {
       const session = await auth();
       if (!session?.user?.id) {
         return NextResponse.json(
-          { success: false, error: 'Authentication required for R2 storage' },
-          { status: 401 }
+          { success: false, error: "Authentication required for R2 storage" },
+          { status: 401 },
         );
       }
       userId = session.user.id;

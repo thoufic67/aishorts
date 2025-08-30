@@ -4,10 +4,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useProject, useUpdateSegment } from "./use-projects";
-import {
-  useUploadFile,
-  useUploadBase64File,
-} from "./use-files";
+import { useUploadFile, useUploadBase64File } from "./use-files";
 import {
   VideoProjectAdapter,
   UseVideoEditorReturn,
@@ -34,7 +31,7 @@ export function useVideoEditor({
     if (!project) {
       return null;
     }
-    
+
     // Pass empty array for projectFiles since files are nested in segments
     return VideoProjectAdapter.projectToVideo(project, []);
   }, [
@@ -45,29 +42,35 @@ export function useVideoEditor({
     project?.status,
     project?.format,
     project?.updatedAt,
-    JSON.stringify(project?.segments?.map(s => ({
-      id: s.id,
-      text: s.text,
-      imagePrompt: s.imagePrompt,
-      order: s.order,
-      duration: s.duration,
-      audioVolume: s.audioVolume,
-      playBackRate: s.playBackRate,
-      withBlur: s.withBlur,
-      backgroundMinimized: s.backgroundMinimized,
-      wordTimings: s.wordTimings,
-      updatedAt: s.updatedAt
-    }))),
+    JSON.stringify(
+      project?.segments?.map((s) => ({
+        id: s.id,
+        text: s.text,
+        imagePrompt: s.imagePrompt,
+        order: s.order,
+        duration: s.duration,
+        audioVolume: s.audioVolume,
+        playBackRate: s.playBackRate,
+        withBlur: s.withBlur,
+        backgroundMinimized: s.backgroundMinimized,
+        wordTimings: s.wordTimings,
+        updatedAt: s.updatedAt,
+      })),
+    ),
     // Files are now included in segments, so include them in dependency check
-    JSON.stringify(project?.segments?.flatMap(s => s.files || []).map(f => ({
-      id: f.id,
-      segmentId: f.segmentId,
-      fileType: f.fileType,
-      r2Url: f.r2Url,
-      tempUrl: f.tempUrl,
-      uploadStatus: f.uploadStatus,
-      createdAt: f.createdAt
-    })))
+    JSON.stringify(
+      project?.segments
+        ?.flatMap((s) => s.files || [])
+        .map((f) => ({
+          id: f.id,
+          segmentId: f.segmentId,
+          fileType: f.fileType,
+          r2Url: f.r2Url,
+          tempUrl: f.tempUrl,
+          uploadStatus: f.uploadStatus,
+          createdAt: f.createdAt,
+        })),
+    ),
   ]);
 
   // Update a video segment
@@ -114,6 +117,10 @@ export function useVideoEditor({
             updates.backgroundMinimized !== undefined
               ? updates.backgroundMinimized
               : currentSegment.backgroundMinimized,
+          imageUrl:
+            updates.imageUrl !== undefined
+              ? updates.imageUrl
+              : currentSegment.imageUrl,
           order:
             updates.order !== undefined ? updates.order : currentSegment.order,
         };

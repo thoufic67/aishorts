@@ -225,6 +225,7 @@ export function VideoPlayerPanel({
             onFrameSelect={selectFrame}
             currentTime={currentTime}
             totalDuration={totalDuration}
+            projectId={projectId}
             onSegmentUpdate={handleSegmentUpdate}
             onSegmentInsert={onSegmentInsert}
             orientation="horizontal"

@@ -149,7 +149,7 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
     style,
     imageSize = "1024x1792", // Default to vertical 9:16 ratio
     aspectRatio = "portrait", // Default to portrait for short videos
-    storeInR2 = false,
+    storeInR2 = true,
     userId,
     projectId,
     segmentId,
@@ -251,7 +251,7 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
               `data:image/png;base64,${imageData.b64_json}`,
               userId,
               projectId,
-              segmentId
+              segmentId,
             );
             r2Key = uploadResult.key;
             r2Url = uploadResult.url;
@@ -261,8 +261,8 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
               imageData.url,
               userId,
               projectId,
-              'image',
-              segmentId
+              "image",
+              segmentId,
             );
             r2Key = uploadResult.key;
             r2Url = uploadResult.url;
@@ -275,15 +275,15 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
 
           // Create file record in database
           const fileName = `generated-image-${Date.now()}.png`;
-          const mimeType = 'image/png';
-          
+          const mimeType = "image/png";
+
           // Estimate file size (rough approximation for PNG)
           const estimatedSize = 1024 * 1024; // 1MB default
-          
+
           fileRecord = await ProjectService.createFile({
             projectId,
             segmentId: segmentId || null,
-            fileType: 'image',
+            fileType: "image",
             fileName: FileUtils.sanitizeFilename(fileName),
             originalName: fileName,
             mimeType,
@@ -291,12 +291,12 @@ Make it viral-worthy, engaging, and perfectly timed for the specified duration. 
             r2Key,
             r2Url,
             tempUrl: imageUrl, // Keep original URL as temp
-            uploadStatus: 'completed',
+            uploadStatus: "completed",
             metadata: {
               prompt: prompt,
               style: style,
               generatedAt: new Date().toISOString(),
-              model: 'gpt-image-1',
+              model: "gpt-image-1",
               size: size,
             },
           });

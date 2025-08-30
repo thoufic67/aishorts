@@ -65,6 +65,7 @@ export function EditSegmentDialog({
   // Initialize form values when segment changes
   useEffect(() => {
     if (segment) {
+      console.log("EditSegmentDialog: segment updated, imageUrl:", segment.imageUrl);
       setImagePrompt(segment.imagePrompt);
       setScript(segment.text);
       setImageModel("flux-schnell");
@@ -87,7 +88,7 @@ export function EditSegmentDialog({
         ...segment,
         imagePrompt: newPrompt,
       };
-      onSegmentUpdate(segmentIndex, updatedSegment);
+      // onSegmentUpdate(segmentIndex, updatedSegment);
     }
   };
 
@@ -97,6 +98,17 @@ export function EditSegmentDialog({
       const updatedSegment: VideoSegment = {
         ...segment,
         text: newScript,
+      };
+      // onSegmentUpdate(segmentIndex, updatedSegment);
+    }
+  };
+
+  const handleSave = () => {
+    if (segment && onSegmentUpdate) {
+      const updatedSegment: VideoSegment = {
+        ...segment,
+        text: script,
+        imagePrompt: imagePrompt,
       };
       onSegmentUpdate(segmentIndex, updatedSegment);
     }
@@ -141,6 +153,7 @@ export function EditSegmentDialog({
         <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
+        <Button onClick={handleSave}>Save</Button>
       </div>
     </>
   );
